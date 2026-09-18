@@ -97,65 +97,17 @@ connection key is only used by the customized (layered) build job.
 
 Production-grade Flask web app with multi-user auth, per-user AWS/GitHub credential store, and live build tracking.
 
-### Quick Start (local)
+### Ways to run the app
 
-```bash
-./scripts/gen-cert.sh certs localhost 127.0.0.1   # one-time; enables HTTPS automatically
-./scripts/run-web.sh                              # HTTPS if certs exist, else HTTP
-```
+Same app, three ways. After doing the [Quick Start](#quick-start) setup above, run it as:
 
-- **Fresh start anytime:** `./scripts/reset.sh` stops the app, wipes the DB + caches, recreates a pristine DB (only `admin`/`admin`), and starts it. Use `./scripts/reset.sh --no-start` to reset without launching, or `./scripts/reset.sh docker` for Docker.
-- Responses are served as **no-cache, always fresh** (`Cache-Control: no-store`), so a plain refresh (or `Cmd+Shift+R` if the tab is old) always shows the latest version — no stale modal/page bugs.
+| Method | Best when | Run instructions |
+|--------|-----------|------------------|
+| 1. **EC2 instance** | you want it hosted in the cloud with a public URL — the recommended option, ideal for demos and sharing | [☞ Method 1 — EC2 instance](#method-1-ec2-instance) |
+| 2. **Docker toolbox** | running the whole Packer/Ansible/AWS toolchain in one container on your machine | [☞ Method 2 — Docker toolbox](#method-2-docker-toolbox) |
+| 3. **Local Python** | fast development and quick checks without containers | [☞ Method 3 — Local Python](#method-3-local-python) |
 
-- Open `https://localhost:8080` (self-signed browser warning is expected) or `http://localhost:8080` if no certs
-- Default admin login: `admin` / `admin` — no forced change on login; a non-blocking banner reminds you to set a new password (use the **Password** menu). New/reset users land straight in the app too.
-- Config via env vars: `ADMIN_USER`, `ADMIN_PASSWORD`, `DATABASE_PATH`, `SECRET_KEY_FILE`, `FLASK_SECRET`, `PORT`, `FLASK_DEBUG` (default `false`), `CUSTOMER`, `DEFAULT_OS`
-- AWS keys entered in the UI are encrypted at rest (Fernet) in SQLite
-- GitHub connection is per-user, stored encrypted (needs a PAT with `workflow` scope)
-- For any port other than 8080: `PORT=8090 ./scripts/run-web.sh`
-
-### Quick Start (Docker) — full toolbox
-
-The image contains the **whole pipeline toolchain**, not just the web app:
-Flask app served by **gunicorn**, plus **AWS CLI v2**, **Packer 1.10.0**, **Ansible**,
-**git**, **ssh**, and **jq** — so you can drive builds and run AWS/Packer/Ansible
-directly from inside the container.
-
-```bash
-docker compose up -d --build            # or: ./scripts/run-web.sh docker
-# or raw docker (mount certs + data + your AWS creds + optionally the repo):
-docker run -d --name golden-image-pipeline -p 8080:8080 \
-  -v $(pwd)/certs:/app/certs:ro \
-  -v golden-image-data:/app/data \
-  -v ~/.aws:/root/.aws:ro \
-  golden-image-pipeline:latest
-```
-
-- **Access**: `https://localhost:8080` — or from any machine on your LAN via the
-  **host machine's IP**: `https://<host-ip>:8080` (e.g. `https://192.168.1.216:8080`).
-  Change the host port with `APP_PORT=9090 docker compose up -d`.
-- **HTTPS** is automatic when `certs/tls.crt`+`certs/tls.key` are present (the
-  `./certs` volume) — plain `http://` otherwise.
-- **Data** (SQLite DB + encryption key) persists in the `golden-image-data` volume.
-- **AWS creds** from `~/.aws` are mounted read-only so `aws`, `packer`, and `ansible`
-  work inside the container. Mount `.` at `/workspace` (read-only) to run ad-hoc
-  `packer validate` / `ansible-playbook --syntax-check` against the repo.
-- **Health**: `GET /api/health` → `{"status":"ok"}` (also the container HEALTHCHECK).
-
-### Feature walkthrough
-
-- **Login/auth**: session-based, admin role creates/resets/deletes users. Login is never blocked: `admin`/`admin` (or any user) signs straight into the app, and a dismissible banner and the **Password** menu cover changing passwords whenever you're ready.
-- **User management**: only admins can access it. The **Users** dialog lists existing users and user creation is opt-in via the "＋ Add New User" button (nothing is forced — you can create users later). Username must be 3-32 chars (`A-Z a-z 0-9 . _ -`), role must be `user` or `admin`, passwords ≥ 8 chars. New/reset users must set their own password on next login. Admins cannot be deleted and you cannot delete your own account.
-- **Connection status panel**: shows whether the logged-in user's AWS account and GitHub connection are live (account ID, region, repo) — with Connect buttons on launch
-- **Multi-user**: each user has their own AWS accounts (access keys stored encrypted) and GitHub PAT
-- **Connect AWS**: add/activate/delete accounts; active account is shown and used for builds; optional `role_arn` for temporary-credential workflows
-- **Connect GitHub**: verify a PAT + repo (build-image.yml must exist in that repo)
-- **Build**: choose OS image, base or customized layer, packages, optional AMI name (e.g. `golden-acme-app`) and extra tags (`Environment=prod,Team=payments`)
-- **Jobs**: every build is recorded in the DB with live status polled from the GitHub run (run ID + URL link), via `GET /api/jobs`
-- **Images**: browse golden AMIs in the connected AWS account (`OS`, `customer`, `layer` tags)
-- **Source AMIs**: resolved automatically from `config/source_amis.json` at build time; edit that file (verified patterns in `Supported Images`) when OS vendors publish updates
-
-### Deploy the web UI on an EC2 instance (demo)
+### Method 1: EC2 instance
 
 The web UI is the control plane: you log in, paste the AWS account + GitHub
 token into the app's Settings, and it dispatches real builds to GitHub Actions.
@@ -184,13 +136,71 @@ Then:
 - Dispatch a build from **Section 1** (base) or **Section 2** (customized) and watch it live in
   **Build Jobs**
 
-Security notes for a demo box:
-- The instance should be **stopped when not demoing** (`docker compose stop` keeps the data volume;
+Security notes:
+- The instance should be **stopped when not in use** (`docker compose stop` keeps the data volume;
   `docker compose start` resumes it). Stopping the **EC2 instance itself** also works
-  (`aws ec2 stop-instances` or the console), and starts again for the next demo.
+  (`aws ec2 stop-instances` or the console), and it starts again on demand.
 - Use a dedicated security group open only to the ports you need (443 or 22), ideally
   source-restricted to your office/company IP range.
 - The default admin password is random per deploy (from `.env`). Change it in the app once logged in.
+
+### Method 2: Docker toolbox
+
+The image contains the **whole pipeline toolchain**, not just the web app:
+Flask app served by **gunicorn**, plus **AWS CLI v2**, **Packer 1.10.0**, **Ansible**,
+**git**, **ssh**, and **jq** — so you can drive builds and run AWS/Packer/Ansible
+directly from inside the container.
+
+```bash
+docker compose up -d --build            # or: ./scripts/run-web.sh docker
+# or raw docker (mount certs + data + your AWS creds + optionally the repo):
+docker run -d --name golden-image-pipeline -p 8080:8080 \
+  -v $(pwd)/certs:/app/certs:ro \
+  -v golden-image-data:/app/data \
+  -v ~/.aws:/root/.aws:ro \
+  golden-image-pipeline:latest
+```
+
+- **Access**: `https://localhost:8080` — or from any machine on your LAN via the
+  **host machine's IP**: `https://<host-ip>:8080` (e.g. `https://192.168.1.216:8080`).
+  Change the host port with `APP_PORT=9090 docker compose up -d`.
+- **HTTPS** is automatic when `certs/tls.crt`+`certs/tls.key` are present (the
+  `./certs` volume) — plain `http://` otherwise.
+- **Data** (SQLite DB + encryption key) persists in the `golden-image-data` volume.
+- **AWS creds** from `~/.aws` are mounted read-only so `aws`, `packer`, and `ansible`
+  work inside the container. Mount `.` at `/workspace` (read-only) to run ad-hoc
+  `packer validate` / `ansible-playbook --syntax-check` against the repo.
+- **Health**: `GET /api/health` → `{"status":"ok"}` (also the container HEALTHCHECK).
+
+### Method 3: Local Python
+
+```bash
+./scripts/gen-cert.sh certs localhost 127.0.0.1   # one-time; enables HTTPS automatically
+./scripts/run-web.sh                              # HTTPS if certs exist, else HTTP
+```
+
+- **Fresh start anytime:** `./scripts/reset.sh` stops the app, wipes the DB + caches, recreates a pristine DB (only `admin`/`admin`), and starts it. Use `./scripts/reset.sh --no-start` to reset without launching, or `./scripts/reset.sh docker` for Docker.
+- Responses are served as **no-cache, always fresh** (`Cache-Control: no-store`), so a plain refresh (or `Cmd+Shift+R` if the tab is old) always shows the latest version — no stale modal/page bugs.
+
+- Open `https://localhost:8080` (self-signed browser warning is expected) or `http://localhost:8080` if no certs
+- Default admin login: `admin` / `admin` — no forced change on login; a non-blocking banner reminds you to set a new password (use the **Password** menu). New/reset users land straight in the app too.
+- Config via env vars: `ADMIN_USER`, `ADMIN_PASSWORD`, `DATABASE_PATH`, `SECRET_KEY_FILE`, `FLASK_SECRET`, `PORT`, `FLASK_DEBUG` (default `false`), `CUSTOMER`, `DEFAULT_OS`
+- AWS keys entered in the UI are encrypted at rest (Fernet) in SQLite
+- GitHub connection is per-user, stored encrypted (needs a PAT with `workflow` scope)
+- For any port other than 8080: `PORT=8090 ./scripts/run-web.sh`
+
+### Feature walkthrough
+
+- **Login/auth**: session-based, admin role creates/resets/deletes users. Login is never blocked: `admin`/`admin` (or any user) signs straight into the app, and a dismissible banner and the **Password** menu cover changing passwords whenever you're ready.
+- **User management**: only admins can access it. The **Users** dialog lists existing users and user creation is opt-in via the "＋ Add New User" button (nothing is forced — you can create users later). Username must be 3-32 chars (`A-Z a-z 0-9 . _ -`), role must be `user` or `admin`, passwords ≥ 8 chars. New/reset users must set their own password on next login. Admins cannot be deleted and you cannot delete your own account.
+- **Connection status panel**: shows whether the logged-in user's AWS account and GitHub connection are live (account ID, region, repo) — with Connect buttons on launch
+- **Multi-user**: each user has their own AWS accounts (access keys stored encrypted) and GitHub PAT
+- **Connect AWS**: add/activate/delete accounts; active account is shown and used for builds; optional `role_arn` for temporary-credential workflows
+- **Connect GitHub**: verify a PAT + repo (build-image.yml must exist in that repo)
+- **Build**: choose OS image, base or customized layer, packages, optional AMI name (e.g. `golden-acme-app`) and extra tags (`Environment=prod,Team=payments`)
+- **Jobs**: every build is recorded in the DB with live status polled from the GitHub run (run ID + URL link), via `GET /api/jobs`
+- **Images**: browse golden AMIs in the connected AWS account (`OS`, `customer`, `layer` tags)
+- **Source AMIs**: resolved automatically from `config/source_amis.json` at build time; edit that file (verified patterns in `Supported Images`) when OS vendors publish updates
 
 ## Production readiness
 
