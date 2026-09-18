@@ -26,7 +26,10 @@ Web UI (Flask) --> GitHub Actions --> Packer --> EC2 (t2.micro / t3.small) --> A
 - GitHub account (a fresh repo is fine — everything is in this repository)
 - AWS CLI + `git` installed locally for the one-time IAM/OIDC setup
 
-## Quick Start
+## Quick Start (common setup for all run methods)
+
+> These steps are the **same for every way of running the app** — they must be done
+> once before using the web UI (see [Ways to run the app](#ways-to-run-the-app)).
 
 ### 0. GitHub repo setup (one-time)
 
@@ -99,7 +102,14 @@ Production-grade Flask web app with multi-user auth, per-user AWS/GitHub credent
 
 ### Ways to run the app
 
-Same app, three ways. After doing the [Quick Start](#quick-start) setup above, run it as:
+> **Prerequisite — common to ALL methods:** before you pick a method below,
+> you must do the [Quick Start](#quick-start) steps **0–2** above once —
+> they set up the GitHub repo + token, the AWS IAM/OIDC role, and the repo
+> secrets. Those steps are the **same for Method 1, 2, and 3**; they are not
+> method-specific. Steps **3–4** (local build test / manual trigger) are
+> optional extras you can skip.
+
+Same app, three ways. After the common Quick Start above, run it as:
 
 | Method | Best when | Run instructions |
 |--------|-----------|------------------|
