@@ -1,0 +1,27 @@
+---
+- name: Customer A organizational packages
+  hosts: all
+  become: true
+  vars:
+    customer: customer_a
+    org_packages:
+      - cloudwatch-agent
+      - aws-support-tools
+
+  tasks:
+    - name: Install organizational packages
+      ansible.builtin.dnf:
+        name: "{{ org_packages }}"
+        state: present
+
+    - name: Update image info with customer packages
+      ansible.builtin.lineinfile:
+        path: /opt/golden-image/image-info.yaml
+        line: "  org_packages: {{ org_packages | join(', ') }}"
+        insertafter: "image_type:"
+
+    - name: Ensure customer directory exists
+      ansible.builtin.file:
+        path: "/opt/golden-image/{{ customer }}"
+        state: directory
+        mode: "0755"

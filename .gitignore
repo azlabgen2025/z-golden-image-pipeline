@@ -1,0 +1,32 @@
+# Packer
+packer/plugins/
+packer/manifest.json
+*.pkrvars.hcl
+!base.pkrvars.hcl
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Env
+.env
+*.pem
+
+# TLS certs
+certs/
+
+# Web app local secrets / db
+web/secret.key
+web/*.db
+
+# Runtime data volume (DB + encryption key)
+data/
+
+# OS
+.DS_Store
+
+# AWS
+.aws/
+credentials

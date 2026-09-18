@@ -1,0 +1,27 @@
+---
+- name: Customer B organizational packages
+  hosts: all
+  become: true
+  vars:
+    customer: customer_b
+    org_packages:
+      - systemd-logs
+      - vim-enhanced
+
+  tasks:
+    - name: Install organizational packages
+      ansible.builtin.dnf:
+        name: "{{ org_packages }}"
+        state: present
+
+    - name: Update image info with customer packages
+      ansible.builtin.lineinfile:
+        path: /opt/golden-image/image-info.yaml
+        line: "  org_packages: {{ org_packages | join(', ') }}"
+        insertafter: "image_type:"
+
+    - name: Ensure customer directory exists
+      ansible.builtin.file:
+        path: "/opt/golden-image/{{ customer }}"
+        state: directory
+        mode: "0755"

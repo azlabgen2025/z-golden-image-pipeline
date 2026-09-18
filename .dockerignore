@@ -1,0 +1,12 @@
+.git
+.gitignore
+certs
+web/golden_image.db
+web/secret.key
+__pycache__
+**/__pycache__
+*.pyc
+.venv
+venv
+DEVLOG.md
+README.md

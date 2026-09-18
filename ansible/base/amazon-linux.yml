@@ -1,0 +1,163 @@
+---
+- name: Configure Amazon Linux base image
+  hosts: all
+  become: true
+  vars:
+    base_packages:
+      - aws-cli
+      - git
+      - vim
+      - htop
+      - tree
+      - jq
+      - curl-minimal
+      - wget
+      - tar
+      - gzip
+      - unzip
+      - python3
+      - python3-pip
+      - cloud-init
+    pip_packages:
+      - boto3
+      - ansible
+    services_enabled:
+      - docker
+      - cloud-init
+    extra_packages: ""
+
+  tasks:
+    - name: Install base packages
+      ansible.builtin.dnf:
+        name: "{{ base_packages }}"
+        state: present
+
+    - name: Install Docker (Amazon Linux 2023)
+      ansible.builtin.dnf:
+        name: docker
+        state: present
+
+    - name: Update package cache (for extra packages)
+      ansible.builtin.dnf:
+        update_cache: true
+      when: extra_packages is defined and extra_packages != ""
+
+    - name: Install extra packages passed via variables
+      ansible.builtin.dnf:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ extra_packages.split(',') | select('!=','') | list }}"
+      register: extra_install
+      ignore_errors: true  # keep failed=true per item so the report task can list them
+      when: extra_packages is defined and extra_packages != ""
+
+    - name: Fail with detailed per-package errors if any extra package could not be installed
+      ansible.builtin.fail:
+        msg: |
+          FAILED TO INSTALL EXTRA PACKAGE(S):
+          {% for r in extra_install.results | default([]) %}
+          {% if r.failed %}
+          - {{ r.item }}: {{ (r.failures | default([]) | join('; ')) or (r.msg | default('unknown error')) }}
+          {% endif %}
+          {% endfor %}
+      when:
+        - extra_packages is defined
+        - extra_packages != ""
+        - (extra_install.results | default([]) | selectattr('failed', 'equalto', true) | list | length) > 0
+
+    - name: Install pip packages
+      ansible.builtin.pip:
+        name: "{{ pip_packages }}"
+        state: present
+
+    - name: Create /opt/golden-image directory
+      ansible.builtin.file:
+        path: /opt/golden-image
+        state: directory
+        mode: "0755"
+
+    - name: Create standard ec2-user account (unified SSH login)
+      ansible.builtin.user:
+        name: ec2-user
+        comment: Standard SSH user (Golden Image Pipeline)
+        shell: /bin/bash
+        create_home: true
+        state: present
+
+    - name: Grant ec2-user passwordless sudo
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/90-golden-ec2-user
+        content: |
+          ec2-user ALL=(ALL) NOPASSWD: ALL
+        mode: "0440"
+        validate: "visudo -cf %s"
+
+    - name: Ensure launch keys get injected into ec2-user on every boot
+      ansible.builtin.copy:
+        dest: /etc/cloud/cloud.cfg.d/99-golden-ec2-user.cfg
+        content: |
+          # Golden Image Pipeline - standard SSH user
+          # Override default_user so EC2 launch keypair gets injected into ec2-user
+          system_info:
+            default_user:
+              name: ec2-user
+          users:
+            - name: ec2-user
+              gecos: Standard SSH user
+              shell: /bin/bash
+        mode: "0644"
+      ignore_errors: true
+
+    - name: Copy SSH keys from bootstrap user so current build key works for ec2-user
+      ansible.builtin.copy:
+        remote_src: true
+        src: "{{ ansible_env.HOME }}/.ssh/authorized_keys"
+        dest: /home/ec2-user/.ssh/authorized_keys
+        owner: ec2-user
+        group: ec2-user
+        mode: "0600"
+      ignore_errors: true
+
+    - name: Bake golden standard SSH key into ec2-user
+      ansible.builtin.lineinfile:
+        path: /home/ec2-user/.ssh/authorized_keys
+        create: true
+        line: "{{ lookup('file', playbook_dir ~ '/vars/golden_user.pub') }}"
+        owner: ec2-user
+        group: ec2-user
+        mode: "0600"
+
+    - name: Create customer marker file
+      ansible.builtin.copy:
+        content: |
+          customer: {{ customer | default('shared') }}
+          image_type: {{ image_type | default('base') }}
+          build_time: {{ ansible_date_time.iso8601 }}
+          ssh_user: ec2-user
+        dest: /opt/golden-image/image-info.yaml
+        mode: "0644"
+
+    - name: Write MOTD banner
+      ansible.builtin.copy:
+        content: |
+          ============================================
+           Golden Image - {{ image_type | default('base') }} (Amazon Linux 2023)
+           Customer: {{ customer | default('shared') }}
+          ============================================
+        dest: /etc/motd
+        mode: "0644"
+
+    - name: Enable services
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+      loop: "{{ services_enabled }}"
+      ignore_errors: true
+
+    - name: Verify Python version
+      ansible.builtin.command: python3 --version
+      register: python_version
+
+    - name: Print Python version
+      ansible.builtin.debug:
+        msg: "Python version: {{ python_version.stdout }}"

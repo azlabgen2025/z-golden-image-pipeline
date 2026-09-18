@@ -1,0 +1,25 @@
+---
+- hosts: all
+  become: true
+  tasks:
+    - name: Create golden image metadata directory
+      file:
+        path: /opt/golden-image
+        state: directory
+        mode: "0755"
+
+    - name: Write image information
+      copy:
+        content: |
+          project: GoldenImage
+          os: other/custom
+          customer: "{{ customer | default('shared') }}"
+        dest: /opt/golden-image/image-info.yaml
+        mode: "0644"
+
+    - name: Write welcome banner
+      copy:
+        content: |
+          This image was built by the Golden Image Pipeline.
+        dest: /etc/motd
+        mode: "0644"

@@ -1,0 +1,36 @@
+services:
+  golden-image-pipeline:
+    build: .
+    image: golden-image-pipeline:latest
+    container_name: golden-image-pipeline
+    ports:
+      # Host port is configurable: APP_PORT=9090 docker compose up -d
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      - DATABASE_PATH=/app/data/golden_image.db
+      - SECRET_KEY_FILE=/app/data/app.key
+      # Random session secret is auto-generated at startup if unset.
+      # - FLASK_SECRET=change-me-in-production
+      - FLASK_DEBUG=false
+      - PORT=8080
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      # Version marker for /api/version (optional).
+      # - BUILD_ID=42
+      # - BUILD_COMMIT=abc1234
+      # HTTPS is automatic: if certs/tls.crt + certs/tls.key exist on the host
+      # (generate once: ./scripts/gen-cert.sh certs localhost 127.0.0.1 <ip>),
+      # the ./certs volume is mounted below and the container starts with TLS.
+      # No TLS_* vars needed.
+    volumes:
+      - golden-image-data:/app/data
+      - ./certs:/app/certs:ro
+      # Optional: give the container your AWS creds to run aws/packer/ansible
+      # directly from inside the container.
+      # - ~/.aws:/root/.aws:ro
+      # Optional: mount the repo for ad-hoc packer/ansible runs from the container.
+      # - .:/workspace:ro
+    restart: unless-stopped
+
+volumes:
+  golden-image-data:

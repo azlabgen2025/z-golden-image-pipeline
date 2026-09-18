@@ -1,0 +1,14 @@
+Golden Image Pipeline
+
+Copyright (c) 2026 Deepesh Rajpal
+
+This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+The original author of this project is Deepesh Rajpal. This notice is
+provided to preserve attribution as required by the license.
+
+This repository also bundles or invokes third-party components (Flask,
+gunicorn, Packer, Ansible, AWS CLI, and related libraries and tools)
+that remain under their own respective licenses.
