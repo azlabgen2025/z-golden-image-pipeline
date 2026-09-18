@@ -1,0 +1,326 @@
+name: Build Golden Image
+
+run-name: Build Golden Image (${{ inputs.os_type || 'amazon-linux' }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      os_type:
+        description: 'Operating System'
+        required: true
+        default: 'amazon-linux'
+        type: choice
+        options:
+          - amazon-linux
+          - ubuntu
+          - debian
+          - debian-13
+          - rocky
+          - rocky-10
+          - fedora
+          - rhel
+          - rhel-10
+          - almalinux
+          - almalinux-10
+          - other
+      customer:
+        description: 'Customer name'
+        required: true
+        default: 'shared'
+        type: string
+      ssh_username:
+        description: 'SSH username when os_type is other (default ec2-user)'
+        required: false
+        default: 'ec2-user'
+        type: string
+      base_packages:
+        description: 'Base image packages (comma separated)'
+        required: false
+        default: ''
+        type: string
+      custom_packages:
+        description: 'Customized image packages (comma separated)'
+        required: false
+        default: ''
+        type: string
+      source_ami:
+        description: 'Reuse an existing base AMI (skip base build)'
+        required: false
+        default: ''
+        type: string
+      base_ami:
+        description: 'Alternate source AMI for the base build (optional)'
+        required: false
+        default: ''
+        type: string
+      ami_name:
+        description: 'Custom base AMI name prefix (optional)'
+        required: false
+        default: ''
+        type: string
+      ami_tags:
+        description: 'Extra AMI tags as key=value pairs, comma separated (optional)'
+        required: false
+        default: ''
+        type: string
+      aws_region:
+        description: 'AWS region for the build'
+        required: false
+        default: 'us-east-1'
+        type: string
+      aws_role_to_assume:
+        description: 'IAM role ARN for the runner to assume (optional, default uses repo secret)'
+        required: false
+        default: ''
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - 'packer/**'
+      - 'ansible/base/**'
+      - 'config/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: golden-image-build-${{ inputs.os_type || 'amazon-linux' }}
+  cancel-in-progress: false
+
+jobs:
+  build-base:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.source_ami == '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      ami_id: ${{ steps.ami.outputs.ami_id }}
+    env:
+      PACKER_DIR: packer/${{ inputs.os_type || 'amazon-linux' }}
+      AWS_REGION: ${{ inputs.aws_region || 'us-east-1' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ inputs.aws_role_to_assume || secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@v3
+        id: setup
+        with:
+          version: "1.10.0"
+
+      - name: Resolve Latest Source AMI (from config/source_amis.json)
+        if: ${{ inputs.os_type != 'other' && inputs.base_ami == '' }}
+        id: resolve
+        run: |
+          OS="${{ inputs.os_type || 'amazon-linux' }}"
+          PATTERN=$(jq -r --arg os "$OS" '.[$os].name_pattern // empty' config/source_amis.json)
+          OWNERS=$(jq -c --arg os "$OS" '.[$os].owners // []' config/source_amis.json)
+          if [ -n "$PATTERN" ] && [ "$OWNERS" != "[]" ]; then
+            OWNER_ARG=$(echo "$OWNERS" | jq -r 'join(" ")')
+            AMI=$(aws ec2 describe-images \
+              --owners $OWNER_ARG \
+              --filters "Name=name,Values=$PATTERN" \
+              --query 'sort_by(Images, &CreationDate)[-1].ImageId' \
+              --output text --region "$AWS_REGION")
+            echo "Resolved $OS source AMI: $AMI"
+            echo "ami_id=$AMI" >> "$GITHUB_OUTPUT"
+          else
+            echo "No config for OS '$OS'; falling back to template defaults."
+            echo "ami_id=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Prepare RSA SSH key (Debian, AlmaLinux & RHEL 10 images reject ED25519 keys)
+        if: ${{ inputs.os_type == 'debian' || inputs.os_type == 'debian-13' || inputs.os_type == 'almalinux' || inputs.os_type == 'almalinux-10' || inputs.os_type == 'rhel-10' }}
+        id: rsa-key
+        run: |
+          KEY_FILE="${RUNNER_TEMP}/packer_rsa_key"
+          ssh-keygen -t rsa -b 2048 -N "" -f "$KEY_FILE" >/dev/null
+          KEY_NAME="packer-rsa-${{ github.run_id }}"
+          aws ec2 import-key-pair --key-name "$KEY_NAME" \
+            --public-key-material "fileb://${KEY_FILE}.pub" --region "$AWS_REGION" >/dev/null
+          echo "KEY_NAME=$KEY_NAME" >> "$GITHUB_ENV"
+          echo "KEY_FILE=$KEY_FILE" >> "$GITHUB_ENV"
+
+      - name: Init Packer Plugins
+        run: packer init .
+        working-directory: ${{ env.PACKER_DIR }}
+
+      - name: Validate Packer Template
+        run: packer validate .
+        working-directory: ${{ env.PACKER_DIR }}
+
+      - name: Build Base AMI
+        env:
+          CUSTOMER: ${{ inputs.customer || 'shared' }}
+          BASE_PKGS: ${{ inputs.base_packages || '' }}
+          BASE_AMI: ${{ steps.resolve.outputs.ami_id || inputs.base_ami || '' }}
+          SSH_USER: ${{ inputs.ssh_username || 'ec2-user' }}
+          IS_OTHER: ${{ inputs.os_type == 'other' }}
+          AMI_NAME: ${{ inputs.ami_name || '' }}
+          AMI_TAGS: ${{ inputs.ami_tags || '' }}
+        run: |
+          ARGS=(-var "customer=$CUSTOMER" -var "department=base")
+          if [ -n "$BASE_PKGS" ]; then
+            EXTRA=$(echo "$BASE_PKGS" | sed 's/[^,]*/"&"/g' | sed '1s/^/[/; $s/$/]/')
+            ARGS+=(-var "extra_packages=$EXTRA")
+          fi
+          if [ -n "$AMI_NAME" ]; then
+            ARGS+=(-var "ami_name=$AMI_NAME")
+          fi
+          if [ -n "$AMI_TAGS" ]; then
+            TAGS=$(echo "$AMI_TAGS" | tr ',;' '\n' | grep -E '^[^=]+=[^=]+$' | sed 's/^\([^=]*\)=\(.*\)$/"\1"="\2"/' | paste -sd, -)
+            if [ -n "$TAGS" ]; then
+              echo "extra_tags={$TAGS}" > ${RUNNER_TEMP}/extra_tags.hcl
+              ARGS+=(-var-file=${RUNNER_TEMP}/extra_tags.hcl)
+            fi
+          fi
+          if [ "$IS_OTHER" = "true" ]; then
+            if [ -z "$BASE_AMI" ]; then
+              echo "ERROR: os_type 'other' requires a source image (base_ami)."
+              exit 1
+            fi
+            ARGS+=(-var "source_ami=$BASE_AMI" -var "ssh_username=$SSH_USER")
+          elif [ -n "$BASE_AMI" ]; then
+            ARGS+=(-var "source_ami=$BASE_AMI")
+          fi
+          if [ -n "$KEY_NAME" ]; then
+            ARGS+=(-var "ssh_keypair_name=$KEY_NAME" -var "ssh_private_key_file=$KEY_FILE")
+          fi
+          echo "Running: packer build ${ARGS[*]} ."
+          packer build "${ARGS[@]}" .
+        working-directory: ${{ env.PACKER_DIR }}
+
+      - name: Cleanup Temporary SSH Keypair
+        if: ${{ always() && (inputs.os_type == 'debian' || inputs.os_type == 'debian-13' || inputs.os_type == 'almalinux' || inputs.os_type == 'almalinux-10' || inputs.os_type == 'rhel-10') }}
+        run: |
+          aws ec2 delete-key-pair --key-name "packer-rsa-${{ github.run_id }}" --region "$AWS_REGION" || true
+
+      - name: Capture AMI ID
+        id: ami
+        run: |
+          if [ -f manifest.json ]; then
+            AMI_ID=$(jq -r '.builds[0].artifact_id' manifest.json | cut -d: -f2)
+          else
+            AMI_ID=""
+          fi
+          echo "ami_id=$AMI_ID" >> "$GITHUB_OUTPUT"
+          echo "Base AMI: $AMI_ID"
+        working-directory: ${{ env.PACKER_DIR }}
+
+      - name: Upload Base Manifest
+        uses: actions/upload-artifact@v5
+        with:
+          name: base-manifest-${{ inputs.os_type || 'amazon-linux' }}
+          path: ${{ env.PACKER_DIR }}/manifest.json
+          if-no-files-found: warn
+
+  build-custom:
+    needs: build-base
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.custom_packages != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PACKER_DIR: packer/${{ inputs.os_type }}
+      AWS_REGION: ${{ inputs.aws_region || 'us-east-1' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ inputs.aws_role_to_assume || secrets.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@v3
+        id: setup
+        with:
+          version: "1.10.0"
+
+      - name: Prepare RSA SSH key (Debian, AlmaLinux & RHEL 10 images reject ED25519 keys)
+        if: ${{ false }}
+        id: rsa-key
+        run: |
+          KEY_FILE="${RUNNER_TEMP}/packer_rsa_key"
+          ssh-keygen -t rsa -b 2048 -N "" -f "$KEY_FILE" >/dev/null
+          KEY_NAME="packer-rsa-${{ github.run_id }}-custom"
+          aws ec2 import-key-pair --key-name "$KEY_NAME" \
+            --public-key-material "fileb://${KEY_FILE}.pub" --region "$AWS_REGION" >/dev/null
+          echo "KEY_NAME=$KEY_NAME" >> "$GITHUB_ENV"
+          echo "KEY_FILE=$KEY_FILE" >> "$GITHUB_ENV"
+
+      - name: Write golden standard SSH private key for custom builds
+        run: |
+          GOLDEN_KEY="${RUNNER_TEMP}/golden_ssh.pem"
+          echo "${{ secrets.GOLDEN_SSH_PRIVATE_KEY }}" > "$GOLDEN_KEY"
+          chmod 600 "$GOLDEN_KEY"
+          echo "GOLDEN_KEY=$GOLDEN_KEY" >> "$GITHUB_ENV"
+
+      - name: Init Packer Plugins
+        run: packer init .
+        working-directory: ${{ env.PACKER_DIR }}
+
+      - name: Validate Packer Template
+        run: packer validate .
+        working-directory: ${{ env.PACKER_DIR }}
+
+      - name: Build Customized AMI (layered on base)
+        env:
+          CUSTOMER: ${{ inputs.customer || 'shared' }}
+          CUSTOM_PKGS: ${{ inputs.custom_packages }}
+          SOURCE_AMI: ${{ inputs.source_ami || needs.build-base.outputs.ami_id || '' }}
+          IS_OTHER: ${{ inputs.os_type == 'other' }}
+          AMI_NAME: ${{ inputs.ami_name || '' }}
+          AMI_TAGS: ${{ inputs.ami_tags || '' }}
+          OS_TYPE: ${{ inputs.os_type }}
+        run: |
+          if [ -z "$SOURCE_AMI" ]; then
+            echo "ERROR: No source AMI available. Provide an existing base AMI or let the base job run."
+            exit 1
+          fi
+          if [ -z "$AMI_NAME" ]; then
+            case "$OS_TYPE" in
+              amazon-linux) AMI_NAME="golden-amazon-linux-2023-customized-layer2" ;;
+              ubuntu)       AMI_NAME="golden-ubuntu-2404-customized-layer2" ;;
+              debian)       AMI_NAME="golden-debian-12-customized-layer2" ;;
+              debian-13)    AMI_NAME="golden-debian-13-customized-layer2" ;;
+              rocky)        AMI_NAME="golden-rocky-9-customized-layer2" ;;
+              rocky-10)     AMI_NAME="golden-rocky-10-customized-layer2" ;;
+              fedora)       AMI_NAME="golden-fedora-43-customized-layer2" ;;
+              rhel)         AMI_NAME="golden-rhel-9-customized-layer2" ;;
+              rhel-10)      AMI_NAME="golden-rhel-10-customized-layer2" ;;
+              almalinux)    AMI_NAME="golden-almalinux-9-customized-layer2" ;;
+              almalinux-10) AMI_NAME="golden-almalinux-10-customized-layer2" ;;
+              *)            AMI_NAME="golden-customized-layer2" ;;
+            esac
+            echo "Using default layer-2 AMI name: $AMI_NAME"
+          fi
+          EXTRA=$(echo "$CUSTOM_PKGS" | sed 's/[^,]*/"&"/g' | sed '1s/^/[/; $s/$/]/')
+          ARGS=(-var "customer=$CUSTOMER" -var "source_ami=$SOURCE_AMI" -var "extra_packages=$EXTRA" -var "department=customized")
+          ARGS+=(-var "ssh_username=ec2-user" -var "ssh_private_key_file=$GOLDEN_KEY")
+          ARGS+=(-var "ami_name=$AMI_NAME")
+          if [ -n "$AMI_TAGS" ]; then
+            TAGS=$(echo "$AMI_TAGS" | tr ',;' '\n' | grep -E '^[^=]+=[^=]+$' | sed 's/^\([^=]*\)=\(.*\)$/"\1"="\2"/' | paste -sd, -)
+            if [ -n "$TAGS" ]; then
+              echo "extra_tags={$TAGS}" > ${RUNNER_TEMP}/extra_tags.hcl
+              ARGS+=(-var-file=${RUNNER_TEMP}/extra_tags.hcl)
+            fi
+          fi
+          echo "Running: packer build ${ARGS[*]} ."
+          packer build "${ARGS[@]}" .
+        working-directory: ${{ env.PACKER_DIR }}
+
+      - name: Upload Custom Manifest
+        uses: actions/upload-artifact@v5
+        with:
+          name: custom-manifest-${{ inputs.os_type }}
+          path: ${{ env.PACKER_DIR }}/manifest.json
+          if-no-files-found: warn

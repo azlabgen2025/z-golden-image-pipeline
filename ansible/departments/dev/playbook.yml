@@ -1,0 +1,29 @@
+---
+- name: Development department packages
+  hosts: all
+  become: true
+  vars:
+    department: dev
+    dept_packages:
+      - git
+      - python3-devel
+      - nodejs
+      - npm
+
+  tasks:
+    - name: Install department packages
+      ansible.builtin.dnf:
+        name: "{{ dept_packages }}"
+        state: present
+
+    - name: Update image info with department packages
+      ansible.builtin.lineinfile:
+        path: /opt/golden-image/image-info.yaml
+        line: "  dept_packages: {{ dept_packages | join(', ') }}"
+        insertafter: "image_type:"
+
+    - name: Ensure department directory exists
+      ansible.builtin.file:
+        path: "/opt/golden-image/{{ department }}"
+        state: directory
+        mode: "0755"

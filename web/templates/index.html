@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Golden Image Pipeline</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+        .container { max-width: 1024px; margin: 0 auto; padding: 2rem; }
+        header { text-align: center; margin-bottom: 1.5rem; }
+        header h1 { color: #ff9900; font-size: 2rem; margin-bottom: 0.3rem; }
+        header p { color: #94a3b8; font-size: 0.9rem; }
+        .topbar { display: flex; justify-content: flex-end; gap: 0.8rem; align-items: center; margin-bottom: 1rem; }
+        .topbar .user { color: #94a3b8; font-size: 0.85rem; }
+        .topbar .btn { width: auto; padding: 0.4rem 0.9rem; font-size: 0.85rem; }
+        .card { background: #1e293b; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid #334155; }
+        .card h2 { color: #ff9900; margin-bottom: 0.25rem; font-size: 1.1rem; }
+        .subtitle { color: #94a3b8; font-size: 0.85rem; margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.4rem; color: #cbd5e1; font-size: 0.9rem; }
+        select, input[type="text"], input[type="password"] { width: 100%; padding: 0.6rem; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; margin-bottom: 1rem; font-size: 0.95rem; }
+        .row { display: flex; gap: 1rem; }
+        .row > div { flex: 1; }
+        .pkg-group { margin-bottom: 1rem; }
+        .pkg-title { font-weight: 600; margin-bottom: 0.5rem; color: #a5b4fc; }
+        .pkg-grid { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .pkg-option { display: inline-flex; align-items: center; gap: 0.4rem; }
+        .pkg-option input { accent-color: #ff9900; }
+        .textbox-label { color: #fbbf24; font-weight: 600; margin-bottom: 0.4rem; }
+        .btn { width: 100%; padding: 0.8rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; background: #ff9900; color: #0f172a; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.9; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { background: #0ea5e9; }
+        .btn-sm { width: auto; padding: 0.4rem 0.9rem; font-size: 0.85rem; }
+        .btn-green { background: #059669; }
+        #status { margin-top: 1rem; padding: 1rem; border-radius: 8px; display: none; }
+        .status-card { display: none; margin-top: 1rem; }
+        .status-msg { margin-top: 1rem; padding: 0.8rem; border-radius: 8px; font-size: 0.9rem; }
+        .success { background: #052e16; color: #86efac; border: 1px solid #16a34a; }
+        .error { background: #450a0a; color: #fca5a5; border: 1px solid #dc2626; }
+        .image-table, .job-table { width: 100%; border-collapse: collapse; }
+        .image-table th, .image-table td, .job-table th, .job-table td { padding: 0.6rem; text-align: left; border-bottom: 1px solid #334155; font-size: 0.85rem; }
+        .image-table th, .job-table th { color: #a5b4fc; font-weight: 600; }
+        .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #0f172a; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .muted { color: #64748b; font-size: 0.85rem; }
+        .note { background: #0f172a; border: 1px dashed #475569; border-radius: 8px; padding: 0.6rem; color: #94a3b8; font-size: 0.85rem; margin-bottom: 1rem; }
+        .banner { display: flex; align-items: center; gap: 1rem; background: #78350f; border: 1px solid #b45309; color: #fcd34d; border-radius: 10px; padding: 0.7rem 1rem; margin-bottom: 1rem; font-size: 0.9rem; }
+        .banner .close-x { margin-left: auto; cursor: pointer; color: #fcd34d; font-size: 1.2rem; line-height: 1; padding: 0.2rem; }
+        .conn-grid { display: flex; gap: 1rem; margin-bottom: 0.5rem; }
+        .conn-box { flex: 1; border: 1px solid #334155; border-radius: 10px; padding: 1rem; background: #0f172a; }
+        .conn-box h3 { font-size: 0.9rem; color: #a5b4fc; margin-bottom: 0.5rem; }
+        .conn-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+        .dot-on { background: #22c55e; }
+        .dot-off { background: #ef4444; }
+        .dot-warn { background: #f59e0b; }
+        .badge { display: inline-block; padding: 0.15rem 0.6rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+        .badge-running { background: #1d4ed8; color: #bfdbfe; }
+        .badge-success { background: #052e16; color: #86efac; }
+        .badge-failed { background: #450a0a; color: #fca5a5; }
+        .badge-queued { background: #334155; color: #cbd5e1; }
+        .badge-simulated { background: #78350f; color: #fcd34d; }
+        .badge-cancelled { background: #44403c; color: #d6d3d1; }
+        .hidden { display: none; }
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; }
+        .modal-backdrop.hidden { display: none !important; }
+        .modal { position: relative; background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 1.8rem 1.8rem 1.2rem; width: 460px; max-width: 92vw; max-height: 90vh; overflow-y: auto; }
+        .modal h2 { color: #ff9900; font-size: 1.1rem; margin-bottom: 1rem; }
+        .modal .close { position: absolute; top: 0.6rem; right: 1rem; cursor: pointer; color: #94a3b8; font-size: 1.4rem; line-height: 1; padding: 0.2rem; }
+        .modal .close:hover { color: #fca5a5; }
+        .modal .actions { display: flex; gap: 0.6rem; margin-top: 1rem; }
+        .btn-cancel { background: transparent; border: 1px solid #475569; color: #e2e8f0; }
+        .btn-cancel:hover { background: #334155; }
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .tab { padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; border: 1px solid #475569; color: #94a3b8; font-size: 0.9rem; }
+        .tab.active { background: #ff9900; color: #0f172a; font-weight: 600; border-color: #ff9900; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Golden Image Pipeline</h1>
+        <p>Build, track, and reuse enterprise golden AMIs across AWS accounts.</p>
+    </header>
+
+    <div class="topbar">
+        <span class="user" id="current-user">Signed in as {{ username }} ({{ role }})</span>
+        <button class="btn btn-sm btn-secondary" onclick="openAccountsModal()">AWS Accounts</button>
+        <button class="btn btn-sm btn-secondary" onclick="openGithubModal()">GitHub</button>
+        {% if role == 'admin' %}
+        <button class="btn btn-sm btn-secondary" onclick="openUsersModal()">Users</button>
+        {% endif %}
+        <button class="btn btn-sm btn-secondary" onclick="openPasswordModal()">Password</button>
+        <button class="btn btn-sm" onclick="logout()">Logout</button>
+    </div>
+
+    {% if must_change_password %}
+    <div class="banner" id="pw-banner">
+        <span>You are still using the default password — set a new one whenever you like.</span>
+        <button class="btn btn-sm btn-green" onclick="openPasswordModal()">Change Password</button>
+        <span class="close-x" onclick="document.getElementById('pw-banner').remove()">&times;</span>
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <h2>Service Connections</h2>
+        <p class="subtitle">Both AWS and GitHub must be connected before builds can run. Status is checked automatically.</p>
+        <div class="conn-grid">
+            <div class="conn-box">
+                <h3>AWS</h3>
+                <div id="aws-status"><span class="muted">Checking...</span></div>
+                <button class="btn btn-sm btn-green" style="margin-top: 0.6rem;" onclick="openAccountsModal()">Manage AWS Accounts</button>
+            </div>
+            <div class="conn-box">
+                <h3>GitHub</h3>
+                <div id="github-status"><span class="muted">Checking...</span></div>
+                <button class="btn btn-sm btn-green" style="margin-top: 0.6rem;" onclick="openGithubModal()">Connect / Manage GitHub</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Build Options</h2>
+        <div class="row">
+            <div>
+                <label for="os">Operating System</label>
+                <select id="os" onchange="toggleOtherImage(); updatePkgGroups()">
+                    {% for os in os_options %}
+                    <option value="{{ os }}" {% if os == os_type %}selected{% endif %}>{{ os_labels.get(os, os|replace('-', ' ')|capitalize) }}</option>
+                    {% endfor %}
+                    <option value="other">Other image from AWS</option>
+                </select>
+                <div class="muted" id="marketplace-note" style="margin-top:0.4rem;">Rocky &amp; AlmaLinux official images come from <strong>AWS Marketplace</strong> (free) — subscribe once per version, then builds work forever: <a href="https://aws.amazon.com/marketplace/pp?sku=3qk9e6x2ni81uiqnorll45r3f" target="_blank" rel="noopener">Rocky&nbsp;9</a> · <a href="https://aws.amazon.com/marketplace/pp?sku=7istt4u6drf5udz02zdppptuy" target="_blank" rel="noopener">Rocky&nbsp;10</a> · <a href="https://aws.amazon.com/marketplace/pp?sku=3kukoxmnoighcsbjd0u4nq9ds" target="_blank" rel="noopener">AlmaLinux&nbsp;9</a> · <a href="https://aws.amazon.com/marketplace/pp?sku=3kukoxmnoighcsbjd0u4nq9ds" target="_blank" rel="noopener">AlmaLinux&nbsp;10</a>. RHEL uses AWS-published free hourly images — no Marketplace opt-in needed.</div>
+                <div style="margin-top:0.5rem;font-size:0.82rem;color:#94a3b8;">All golden images create a standard <code>ec2-user</code> account &mdash; after launch, log in with <code>ssh -i &lt;keypair&gt; ec2-user@&lt;instance-ip&gt;</code> regardless of OS.</div>
+            </div>
+            <div>
+                <label for="customer">Customer</label>
+                <input type="text" id="customer" value="{{ customer }}" placeholder="e.g., customer_a, customer_b">
+            </div>
+        </div>
+        <div id="other-image-box" style="display:none;">
+            <label class="textbox-label">AWS Image Name or AMI ID</label>
+            <input type="text" id="alt-image" placeholder="e.g., ami-0123456789abcdef0 or a custom image name on AWS">
+            <label for="ssh-username">SSH Username (optional)</label>
+            <input type="text" id="ssh-username" placeholder="ec2-user">
+            <div class="muted">Builds a golden image from the specified AWS image (used as the source).</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>AMI Naming & Tags</h2>
+        <p class="subtitle">Optional. The AMI gets Project=GoldenImage, ManagedBy=Packer, OS, and Customer tags automatically.</p>
+        <div class="row">
+            <div>
+                <label for="ami-name">AMI Name (optional)</label>
+                <input type="text" id="ami-name" placeholder="golden-amazon-linux-dev" title="Overrides the default golden-&lt;os&gt;-base or golden-&lt;os&gt;-custom name">
+            </div>
+            <div>
+                <label for="ami-tags">Extra Tags (key=value, comma separated, optional)</label>
+                <input type="text" id="ami-tags" placeholder="Environment=prod,CostCenter=123">
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>1) Base Golden Image</h2>
+        <p class="subtitle">Organization-level base image: core OS packages and tools every instance needs.</p>
+        <div class="note">
+            <strong>Base source:</strong> By default the latest official {{ os_type|replace('-', ' ')|capitalize }} image is resolved from AWS at build time. To build from any other image on AWS, choose <strong>Other image from AWS</strong> and enter its AMI ID or name.
+        </div>
+        <div id="packages-base">
+            {% for os, groups in os_package_groups.items() %}
+            {% for group, pkgs in groups.items() %}
+            <div class="pkg-group" data-os="{{ os }}">
+                <div class="pkg-title">{{ os|replace('-', ' ')|capitalize }} · {{ group }}</div>
+                <div class="pkg-grid">
+                    {% for pkg in pkgs %}
+                    <label class="pkg-option"><input type="checkbox" class="base-pkg" value="{{ pkg }}"> {{ pkg }}</label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+            {% endfor %}
+        </div>
+        <label class="textbox-label">Additional base packages (comma separated)</label>
+        <input type="text" id="base-packages-extra" placeholder="e.g., htop, strace, tmux">
+        <button class="btn" id="buildBaseBtn" onclick="triggerBuild('base')">Build Base Golden Image</button>
+        <div id="status-base"></div>
+    </div>
+
+    <div class="card">
+        <h2>2) Further Customized Image</h2>
+        <p class="subtitle">Department/customer image layered on a base golden image. The OS follows the <strong>base image you select</strong> — not the OS dropdown above.</p>
+        <div id="no-base-warning" class="note" style="display:none; color:#fca5a5; border-color:#7f1d1d;">
+            No base golden image exists yet — build one in <strong>Section 1</strong> first.
+        </div>
+        <label for="base-select">Base Golden Image (required)</label>
+        <select id="base-select" disabled>
+            <option value="">Loading base golden images...</option>
+        </select>
+        <div class="muted" id="base-select-status">Loading existing images...</div>
+        <div id="base-os-note" class="note" style="display:none;"></div>
+        <label class="textbox-label">Customized AMI Name (optional)</label>
+        <input type="text" id="custom-ami-name" placeholder="golden-&lt;os&gt;-customized-layer2" title="Overrides the default golden-&lt;os&gt;-customized-layer2 name">
+        <div class="muted">Defaults to <code>golden-&lt;os&gt;-customized-layer2</code> when left blank.</div>
+        <div id="packages-custom">
+            {% for os, groups in os_package_groups.items() %}
+            {% for group, pkgs in groups.items() %}
+            <div class="pkg-group" data-os="{{ os }}">
+                <div class="pkg-title">{{ os|replace('-', ' ')|capitalize }} · {{ group }}</div>
+                <div class="pkg-grid">
+                    {% for pkg in pkgs %}
+                    <label class="pkg-option"><input type="checkbox" class="custom-pkg" value="{{ pkg }}"> {{ pkg }}</label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+            {% endfor %}
+        </div>
+        <label class="textbox-label">Additional customized packages (comma separated)</label>
+        <input type="text" id="custom-packages-extra" placeholder="e.g., nginx, nodejs, postgresql" disabled>
+        <button class="btn btn-secondary" id="buildCustomBtn" onclick="triggerBuild('customized')" disabled>Build Further Customized Image</button>
+        <div id="status-custom"></div>
+    </div>
+
+    <div class="card">
+        <h2>Build Jobs</h2>
+        <p class="subtitle">Submitted builds and their live status from GitHub Actions.</p>
+        <div id="jobs"><span class="muted">Loading jobs...</span></div>
+    </div>
+
+    <div class="card">
+        <h2>Available Golden Images</h2>
+        <p class="subtitle">Read-only list of previously built images.</p>
+        <div id="images"><span class="muted">Loading images...</span></div>
+    </div>
+</div>
+
+<!-- Modals -->
+<div id="accounts-modal" class="modal-backdrop hidden">
+    <div class="modal">
+        <span class="close" onclick="hideModal('accounts-modal')">&times;</span>
+        <h2>AWS Accounts</h2>
+        <div id="accounts-list"><span class="muted">Loading...</span></div>
+        <hr style="border-color:#334155; margin:1rem 0;">
+        <h3 style="color:#a5b4fc; font-size:0.95rem; margin-bottom:0.8rem;">Add New AWS Account</h3>
+        <label>Account Name</label>
+        <input type="text" id="acc-name" placeholder="e.g., Production, Lab, Team-A">
+        <label>Access Key ID</label>
+        <input type="text" id="acc-access" placeholder="AKIA...">
+        <label>Secret Access Key</label>
+        <input type="password" id="acc-secret" placeholder="(stored encrypted)">
+        <label>Region</label>
+        <input type="text" id="acc-region" value="us-east-1">
+        <label>GitHub-Actions Role ARN (optional)</label>
+        <input type="text" id="acc-role" placeholder="arn:aws:iam::123456789012:role/GitHubActionsPackerRole" title="If set, the build runner assumes this role via OIDC. Leave empty to use the account default.">
+        <button class="btn btn-sm btn-green" onclick="addAwsAccount()">Save AWS Account</button>
+        <button class="btn btn-sm btn-cancel" onclick="hideModal('accounts-modal')">Cancel</button>
+        <div id="accounts-msg"></div>
+    </div>
+</div>
+
+<div id="github-modal" class="modal-backdrop hidden">
+    <div class="modal">
+        <span class="close" onclick="hideModal('github-modal')">&times;</span>
+        <h2>GitHub Connection</h2>
+        <div id="github-current"><span class="muted">Checking...</span></div>
+        <label>Personal Access Token (<code>workflow</code> scope required)</label>
+        <input type="password" id="gh-token" placeholder="ghp_...">
+        <label>Repository (owner/repo)</label>
+        <input type="text" id="gh-repo" placeholder="yourorg/golden-image-pipeline">
+        <button class="btn btn-sm btn-green" onclick="saveGithub()">Save &amp; Test GitHub Connection</button>
+        <button class="btn btn-sm btn-cancel" onclick="hideModal('github-modal')">Cancel</button>
+        <div id="github-msg"></div>
+    </div>
+</div>
+
+<div id="password-modal" class="modal-backdrop hidden">
+    <div class="modal">
+        <span class="close" onclick="hideModal('password-modal')">&times;</span>
+        <h2>Change Password</h2>
+        <label>Current Password</label>
+        <input type="password" id="pw-current">
+        <label>New Password (min 8 chars)</label>
+        <input type="password" id="pw-new">
+        <label>Confirm New Password</label>
+        <input type="password" id="pw-new2">
+        <button class="btn btn-sm btn-green" onclick="changePassword()">Change Password</button>
+        <button class="btn btn-sm btn-cancel" onclick="hideModal('password-modal')">Cancel</button>
+        <div id="password-msg"></div>
+    </div>
+</div>
+
+<div id="users-modal" class="modal-backdrop hidden">
+    <div class="modal">
+        <span class="close" onclick="hideModal('users-modal')">&times;</span>
+        <h2>User Management (Admin)</h2>
+        <div id="users-list"><span class="muted">Loading...</span></div>
+        <div id="add-user-box" class="hidden" style="margin-top:1rem;">
+            <hr style="border-color:#334155;">
+            <h3 style="color:#a5b4fc; font-size:0.95rem; margin:0.8rem 0;">Add New User</h3>
+            <label>Username</label>
+            <input type="text" id="new-user-name">
+            <label>Initial Password (min 8 chars)</label>
+            <input type="password" id="new-user-pass">
+            <label>Role</label>
+            <select id="new-user-role">
+                <option value="user">user</option>
+                <option value="admin">admin</option>
+            </select>
+            <button class="btn btn-sm btn-green" onclick="createUser()">Create User</button>
+            <button class="btn btn-sm btn-cancel" onclick="hideModal('users-modal')">Cancel</button>
+            <button class="btn btn-sm" onclick="toggleAddUser(false)">Close</button>
+            <div id="users-msg"></div>
+        </div>
+        <button class="btn btn-sm btn-secondary" id="add-user-btn" onclick="toggleAddUser(true)">＋ Add New User</button>
+    </div>
+</div>
+
+<script>
+// ---------- Utils ----------
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const badge = s => ({ running:'badge-running', success:'badge-success', failed:'badge-failed', queued:'badge-queued', cancelled:'badge-cancelled', simulated:'badge-simulated' }[s] || 'badge-queued');
+
+function showModal(id) { $(id).classList.remove('hidden'); }
+function hideModal(id) { $(id).classList.add('hidden'); }
+
+// ---------- Auth ----------
+async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/';
+}
+
+async function changePassword() {
+    const msg = $('password-msg');
+    const current = $('pw-current').value;
+    const newpw = $('pw-new').value;
+    const newpw2 = $('pw-new2').value;
+    if (newpw.length < 8) { msg.className = 'status-msg error'; msg.innerHTML = 'New password must be at least 8 characters'; return; }
+    if (newpw !== newpw2) { msg.className = 'status-msg error'; msg.innerHTML = 'New passwords do not match'; return; }
+    try {
+        const res = await fetch('/api/auth/change-password', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ current, new: newpw })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed');
+        msg.className = 'status-msg success'; msg.innerHTML = data.message;
+        $('pw-current').value = ''; $('pw-new').value = ''; $('pw-new2').value = '';
+        const b = $('pw-banner'); if (b) b.remove();
+        setTimeout(hideModal, 1200, 'password-modal');
+    } catch (e) {
+        msg.className = 'status-msg error'; msg.innerHTML = e.message;
+    }
+}
+
+// ---------- Connections ----------
+async function loadStatus() {
+    try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        if (data.status !== 'ok') { window.location.href = '/'; return; }
+        renderAwsStatus(data.aws);
+        renderGithubStatus(data.github);
+    } catch (e) { /* server not reachable */ }
+}
+
+function renderAwsStatus(aws) {
+    const el = $('aws-status');
+    if (aws.connected) {
+        el.innerHTML = `
+            <span class="conn-dot dot-on"></span><strong>Connected</strong><br>
+            <span class="muted">${esc(aws.account_name)} · ${esc(aws.account_id)} · ${esc(aws.region)}</span>`;
+    } else {
+        el.innerHTML = `<span class="conn-dot dot-off"></span><strong>Not connected</strong><br>
+            <span class="muted">${esc(aws.message || 'No AWS account configured')}</span>`;
+    }
+}
+
+function renderGithubStatus(g) {
+    const el = $('github-status');
+    if (g.connected) {
+        el.innerHTML = `<span class="conn-dot dot-on"></span><strong>Connected</strong><br><span class="muted">${esc(g.repo)}</span>`;
+    } else {
+        el.innerHTML = `<span class="conn-dot dot-off"></span><strong>Not connected</strong><br>
+            <span class="muted">${esc(g.message || 'No GitHub repository connected')}</span>`;
+    }
+}
+
+// ---------- AWS Accounts ----------
+async function loadAwsAccounts() {
+    const el = $('accounts-list');
+    try {
+        const res = await fetch('/api/aws/accounts');
+        const data = await res.json();
+        if (data.status !== 'ok') throw new Error(data.message);
+        if (data.accounts.length === 0) {
+            el.innerHTML = '<span class="muted">No AWS accounts configured yet.</span>';
+            return;
+        }
+        let html = '<table class="image-table"><thead><tr><th>Name</th><th>Region</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+        ForEachAccount(data.accounts, acc => {
+            html += `<tr>
+                <td>${esc(acc.name)}</td>
+                <td>${esc(acc.region)}</td>
+                <td>${acc.is_active ? '<span class="badge badge-success">Active</span>' : '<span class="muted">inactive</span>'}</td>
+                <td>
+                    ${acc.is_active ? '' : `<button class="btn btn-sm" onclick="activateAccount(${acc.id})">Activate</button>`}
+                    <button class="btn btn-sm btn-secondary" onclick="deleteAccount(${acc.id})">Delete</button>
+                </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+    } catch (e) {
+        el.innerHTML = `<span class="muted">${esc(e.message)}</span>`;
+    }
+}
+
+function ForEachAccount(accounts, fn) { accounts.forEach(fn); }
+
+async function addAwsAccount() {
+    const msg = $('accounts-msg');
+    const payload = {
+        name: $('acc-name').value.trim(),
+        access_key: $('acc-access').value.trim(),
+        secret_key: $('acc-secret').value,
+        region: $('acc-region').value.trim() || 'us-east-1',
+        role_arn: $('acc-role').value.trim()
+    };
+    try {
+        const res = await fetch('/api/aws/accounts', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed');
+        msg.className = 'status-msg success'; msg.innerHTML = data.message;
+        ['acc-name','acc-access','acc-secret','acc-role'].forEach(i => $(i).value = '');
+        loadAwsAccounts(); loadStatus();
+    } catch (e) {
+        msg.className = 'status-msg error'; msg.innerHTML = e.message;
+    }
+}
+
+async function activateAccount(id) {
+    await fetch(`/api/aws/accounts/${id}/activate`, { method: 'POST' });
+    loadAwsAccounts(); loadStatus();
+}
+
+async function deleteAccount(id) {
+    if (!confirm('Delete this AWS account?')) return;
+    await fetch(`/api/aws/accounts/${id}`, { method: 'DELETE' });
+    loadAwsAccounts(); loadStatus();
+}
+
+// ---------- GitHub ----------
+async function loadGithubModal() {
+    const el = $('github-current');
+    try {
+        const res = await fetch('/api/github');
+        const data = await res.json();
+        if (data.status !== 'ok') throw new Error(data.message);
+        if (data.connected) {
+            el.innerHTML = `<span class="conn-dot dot-on"></span> Connected to <strong>${esc(data.repo)}</strong>`;
+            $('gh-repo').value = data.repo;
+        } else {
+            el.innerHTML = '<span class="muted">Not connected.</span>';
+        }
+    } catch (e) {
+        el.innerHTML = `<span class="muted">${esc(e.message)}</span>`;
+    }
+}
+
+async function saveGithub() {
+    const msg = $('github-msg');
+    const payload = { token: $('gh-token').value.trim(), repo: $('gh-repo').value.trim() };
+    try {
+        const res = await fetch('/api/github', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed');
+        msg.className = 'status-msg success'; msg.innerHTML = data.message;
+        $('gh-token').value = '';
+        loadGithubModal(); loadStatus();
+    } catch (e) {
+        msg.className = 'status-msg error'; msg.innerHTML = e.message;
+    }
+}
+
+// ---------- Users (admin) ----------
+function toggleAddUser(show) {
+    $('add-user-box').classList.toggle('hidden', !show);
+    $('add-user-btn').classList.toggle('hidden', show);
+    if (show) $('new-user-name').focus();
+}
+async function loadUsers() {
+    const el = $('users-list');
+    try {
+        const res = await fetch('/api/users');
+        const data = await res.json();
+        if (res.status === 403) { el.innerHTML = '<span class="muted">Admin only</span>'; return; }
+        const users = data.users || [];
+        if (!users.length) { el.innerHTML = '<span class="muted">No users yet — add the first one below.</span>'; return; }
+        let html = `<h3 style="color:#a5b4fc; font-size:0.95rem; margin-bottom:0.5rem;">Existing Users (${users.length})</h3>`;
+        html += '<table class="image-table"><thead><tr><th>User</th><th>Role</th><th>Password</th><th>Action</th></tr></thead><tbody>';
+        users.forEach(u => {
+            html += `<tr>
+                <td>${esc(u.username)}</td>
+                <td>${esc(u.role)}</td>
+                <td>${u.must_change_password ? '<span class="badge badge-warn" style="background:#78350f;color:#fcd34d;">must change</span>' : '<span class="muted">set</span>'}</td>
+                <td><button class="btn btn-sm btn-secondary" onclick="resetUserPassword(${u.id})">Reset PW</button>${u.role !== 'admin' ? ` <button class="btn btn-sm" onclick="deleteUser(${u.id})">Delete</button>` : ''}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+    } catch (e) {
+        el.innerHTML = `<span class="muted">${esc(e.message)}</span>`;
+    }
+}
+
+async function createUser() {
+    const msg = $('users-msg');
+    try {
+        const res = await fetch('/api/users', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: $('new-user-name').value.trim(),
+                password: $('new-user-pass').value,
+                role: $('new-user-role').value
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed');
+        msg.className = 'status-msg success'; msg.innerHTML = data.message;
+        $('new-user-name').value = ''; $('new-user-pass').value = '';
+        setTimeout(() => {
+            toggleAddUser(false);
+            hideModal('users-modal');
+        }, 900);
+    } catch (e) {
+        msg.className = 'status-msg error'; msg.innerHTML = e.message;
+    }
+}
+
+async function deleteUser(id) {
+    if (!confirm('Delete user?')) return;
+    await fetch(`/api/users/${id}`, { method: 'DELETE' });
+    loadUsers();
+}
+
+async function resetUserPassword(id) {
+    const newpass = prompt('Enter a temporary password (min 8 chars):');
+    if (!newpass) return;
+    await fetch(`/api/users/${id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset_password', new_password: newpass })
+    });
+    loadUsers();
+}
+
+// ---------- Images ----------
+const NO_BASE_MSG = 'No base golden image found yet — build one in Section 1 first.';
+
+async function loadImages() {
+    const el = $('images');
+    const sel = $('base-select');
+    const selStatus = $('base-select-status');
+    try {
+        const res = await fetch('/api/images');
+        const data = await res.json();
+        if (data.status !== 'ok') throw new Error(data.message);
+        const images = data.images;
+        const baseImages = images.filter(img => img.layer === 'base');
+        if (images.length === 0) {
+            el.innerHTML = '<span class="muted">No golden images found yet.</span>';
+            setSection2Disabled(true);
+            selStatus.innerHTML = NO_BASE_MSG;
+            return;
+        }
+        let html = '<table class="image-table"><thead><tr><th>AMI ID</th><th>Name</th><th>OS</th><th>Customer</th><th>Layer</th><th>Created</th></tr></thead><tbody>';
+        images.forEach(img => {
+            html += `<tr><td>${esc(img.ami_id)}</td><td>${esc(img.name)}</td><td>${esc(img.os)}</td><td>${esc(img.customer)}</td><td>${esc(img.layer)}</td><td>${esc(img.created)}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+
+        if (baseImages.length === 0) {
+            setSection2Disabled(true);
+            selStatus.innerHTML = NO_BASE_MSG;
+            return;
+        }
+        sel.innerHTML = '<option value="">Select a base golden image...</option>';
+        baseImages.forEach(img => {
+            const osType = img.os_type || '';
+            const label = `${img.os || 'Unknown OS'} · ${img.ami_id} · ${esc(img.customer || 'shared')}`;
+            sel.appendChild(new Option(label, img.ami_id));
+        });
+        sel.dataset.osTypes = JSON.stringify(
+            baseImages.map(img => [img.ami_id, img.os_type || '', img.os || ''])
+        );
+        sel.disabled = false;
+        selStatus.innerHTML = `${baseImages.length} base golden image(s) available to customize.`;
+        setSection2Disabled(false, true);
+        sel.onchange = () => onBaseSelectChange(sel);
+    } catch (e) {
+        el.innerHTML = `<span class="muted">${esc(e.message || 'Unable to load images')}</span>`;
+        setSection2Disabled(true);
+        selStatus.innerHTML = 'Unable to load images — a new base will be built.';
+    }
+}
+
+function onBaseSelectChange(sel) {
+    const baseOsNote = $('base-os-note');
+    const value = sel.value;
+    if (!value) {
+        baseOsNote.style.display = 'none';
+        setCustomPkgGroups('', true);
+        $('buildCustomBtn').disabled = true;
+        return;
+    }
+    let osType = '', osLabel = '';
+    try {
+        const map = JSON.parse(sel.dataset.osTypes || '[]');
+        const hit = map.find(([id]) => id === value);
+        if (hit) { osType = hit[1]; osLabel = hit[2]; }
+    } catch (e) { /* ignore */ }
+    if (osType) {
+        setCustomPkgGroups(osType, false);
+        baseOsNote.innerHTML = `Customizing a <strong>${esc(osLabel)}</strong> base image — package list above is for that OS.`;
+        baseOsNote.style.display = 'block';
+        $('buildCustomBtn').disabled = false;
+    } else {
+        baseOsNote.style.display = 'none';
+        setCustomPkgGroups('', true);
+        $('buildCustomBtn').disabled = true;
+    }
+}
+
+function setSection2Disabled(disabled, forceButtonDisabled) {
+    const sel = $('base-select');
+    sel.disabled = disabled;
+    $('custom-packages-extra').disabled = disabled;
+    const btn = $('buildCustomBtn');
+    btn.disabled = disabled || (forceButtonDisabled === undefined ? true : forceButtonDisabled);
+    $('no-base-warning').style.display = disabled ? 'block' : 'none';
+    if (disabled) {
+        setCustomPkgGroups('', true);
+        $('base-os-note').style.display = 'none';
+    }
+}
+
+function setCustomPkgGroups(osType, allDisabled) {
+    document.querySelectorAll('#packages-custom .pkg-group').forEach(g => {
+        const show = !allDisabled && (g.dataset.os === osType);
+        g.style.display = show ? '' : 'none';
+        if (!show) g.querySelectorAll('input[type=checkbox]').forEach(c => { c.checked = false; });
+    });
+}
+
+// ---------- Build Trigger ----------
+function collectPackages(selector) {
+    return [...document.querySelectorAll(selector + ':checked')].map(c => c.value);
+}
+
+async function triggerBuild(target) {
+    const isBase = (target === 'base');
+    const btnId = isBase ? 'buildBaseBtn' : 'buildCustomBtn';
+    const status = $(isBase ? 'status-base' : 'status-custom');
+    const btn = $(btnId);
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Dispatching...';
+    status.className = 'status-msg'; status.innerHTML = '';
+
+    const basePkgs = collectPackages('.base-pkg');
+    const baseExtra = $('base-packages-extra').value.trim();
+    if (baseExtra) basePkgs.push(...baseExtra.split(',').map(s => s.trim()).filter(Boolean));
+
+    const customPkgs = collectPackages('.custom-pkg');
+    const customExtra = $('custom-packages-extra').value.trim();
+    if (customExtra) customPkgs.push(...customExtra.split(',').map(s => s.trim()).filter(Boolean));
+
+    const customer = $('customer').value.trim() || 'shared';
+    let osType = $('os').value;
+    const sel = $('base-select');
+    let sourceAmi = '';
+    if (!isBase) {
+        if (!sel.value) {
+            status.className = 'status-msg error';
+            status.innerHTML = 'Select a base golden image first (Section 2 requires a Section 1 base image).';
+            btn.disabled = false;
+            btn.innerHTML = isBase ? 'Build Base Golden Image' : 'Build Further Customized Image';
+            return;
+        }
+        sourceAmi = sel.value;
+        try {
+            const map = JSON.parse(sel.dataset.osTypes || '[]');
+            const hit = map.find(([id]) => id === sourceAmi);
+            if (hit && hit[1]) osType = hit[1];
+        } catch (e) { /* keep dropdown OS */ }
+    }
+    const altImage = (osType === 'other') ? $('alt-image').value.trim() : '';
+    const sshUsername = (osType === 'other') ? $('ssh-username').value.trim() : '';
+    const amiName = (isBase ? $('ami-name').value : $('custom-ami-name').value).trim() || $('ami-name').value.trim();
+    const amiTags = $('ami-tags').value.trim();
+
+    if (osType === 'other' && !altImage) {
+        status.className = 'status-msg error';
+        status.innerHTML = 'Please enter an AWS image name or AMI ID.';
+        btn.disabled = false;
+        btn.innerHTML = isBase ? 'Build Base Golden Image' : 'Build Further Customized Image';
+        return;
+    }
+
+    const payload = { target, os_type: osType, customer, alt_image: altImage, ssh_username: sshUsername, ami_name: amiName, ami_tags: amiTags };
+    if (isBase) {
+        payload.base_packages = basePkgs;
+    } else {
+        payload.base_packages = basePkgs;
+        payload.custom_packages = customPkgs;
+        payload.source_ami = sourceAmi;
+    }
+
+    try {
+        const res = await fetch('/api/build', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Build failed');
+        status.className = 'status-msg success';
+        status.innerHTML = `Build dispatched! Job #${data.job_id}. ` +
+            (data.message || '') +
+            ` OS: ${esc(data.os_type)}, Customer: ${esc(data.customer)}.` +
+            (amiName ? `<br>AMI name: <strong>${esc(amiName)}</strong>` : '') +
+            (amiTags ? `<br>Tags: <strong>${esc(amiTags)}</strong>` : '');
+        loadJobs();
+    } catch (e) {
+        status.className = 'status-msg error';
+        status.innerHTML = 'Failed to dispatch build: ' + esc(e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = isBase ? 'Build Base Golden Image' : 'Build Further Customized Image';
+    }
+}
+
+// ---------- Jobs ----------
+async function loadJobs() {
+    const el = $('jobs');
+    try {
+        const res = await fetch('/api/jobs');
+        const data = await res.json();
+        if (data.status !== 'ok') throw new Error(data.message);
+        if (data.jobs.length === 0) {
+            el.innerHTML = '<span class="muted">No builds submitted yet.</span>';
+            return;
+        }
+        let html = '<table class="job-table"><thead><tr><th>#</th><th>Type</th><th>OS</th><th>Customer</th><th>AMI Name</th><th>Status</th><th>Run</th><th>Submitted</th></tr></thead><tbody>';
+        data.jobs.forEach(j => {
+            const statusBadge = `<span class="badge ${badge(j.status)}">${esc(j.status)}</span>`;
+            const runLink = j.run_url ? `<a href="${esc(j.run_url)}" target="_blank" style="color:#0ea5e9;">${j.run_id}</a>` : '<span class="muted">—</span>';
+            html += `<tr>
+                <td>${j.id}</td>
+                <td>${esc(j.run_type)}</td>
+                <td>${esc(j.os_type)}</td>
+                <td>${esc(j.customer)}</td>
+                <td>${esc(j.ami_name || j.os_type)}</td>
+                <td>${statusBadge}</td>
+                <td>${runLink}</td>
+                <td>${esc((j.created_at || '').slice(0, 19).replace('T', ' '))}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+    } catch (e) {
+        el.innerHTML = `<span class="muted">${esc(e.message || 'Unable to load jobs')}</span>`;
+    }
+}
+
+function toggleOtherImage() {
+    $('other-image-box').style.display = ($('os').value === 'other') ? 'block' : 'none';
+}
+
+function updatePkgGroups() {
+    const os = $('os').value;
+    document.querySelectorAll('#packages-base .pkg-group').forEach(g => {
+        const show = (g.dataset.os === os);
+        g.style.display = show ? '' : 'none';
+        if (!show) g.querySelectorAll('input[type=checkbox]').forEach(c => { c.checked = false; });
+    });
+}
+
+// ---------- Modal open hooks ----------
+function openAccountsModal() { showModal('accounts-modal'); loadAwsAccounts(); }
+function openGithubModal() { showModal('github-modal'); loadGithubModal(); }
+function openUsersModal() { showModal('users-modal'); loadUsers(); }
+function openPasswordModal() { showModal('password-modal'); }
+
+document.querySelector('#accounts-modal .close').addEventListener('click', () => hideModal('accounts-modal'));
+document.querySelector('#github-modal .close').addEventListener('click', () => hideModal('github-modal'));
+document.querySelector('#password-modal .close').addEventListener('click', () => hideModal('password-modal'));
+document.querySelector('#users-modal .close').addEventListener('click', () => hideModal('users-modal'));
+
+// Clicking the dark backdrop (outside the box) closes the modal
+document.querySelectorAll('.modal-backdrop').forEach(bd => {
+    bd.addEventListener('mousedown', e => { if (e.target === bd) hideModal(bd.id); });
+});
+// Escape closes any open modal
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-backdrop').forEach(bd => {
+            if (!bd.classList.contains('hidden')) hideModal(bd.id);
+        });
+    }
+});
+
+// ---------- Boot ----------
+toggleOtherImage();
+updatePkgGroups();
+// Defensive: every dialog starts hidden — the working page is always what loads.
+document.querySelectorAll('.modal-backdrop').forEach(bd => bd.classList.add('hidden'));
+loadStatus();
+loadImages();
+loadJobs();
+setInterval(loadJobs, 8000);
+</script>
+<footer style="text-align:center; color:#475569; font-size:0.75rem; margin:2rem 0 1rem;">Golden Image Pipeline — {{ APP_VERSION.marker }} &middot; &copy; 2026 Deepesh Rajpal. All rights reserved. <a href="{{ url_for('notices') }}" style="color:inherit;">NOTICE</a></footer>
+</body>
+</html>

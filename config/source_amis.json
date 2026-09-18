@@ -1,0 +1,75 @@
+{
+  "_comment": "Central source-AMI configuration. When Amazon or distro vendors change the official image name patterns, owners, or default ssh user, update this file (and commit it) — the build workflow resolves the newest matching AMI automatically at build time. No template restart needed.",
+  "amazon-linux": {
+    "name_pattern": "al2023-ami-2023.*-x86_64",
+    "owners": ["amazon"],
+    "ssh_user": "ec2-user",
+    "note": "Amazon Linux 2023. When a new major Amazon Linux ships, update name_pattern (e.g. al2026-*)."
+  },
+  "ubuntu": {
+    "name_pattern": "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*",
+    "owners": ["099720109477"],
+    "ssh_user": "ubuntu",
+    "note": "Ubuntu 24.04 LTS (Canonical account 099720109477)."
+  },
+  "debian": {
+    "name_pattern": "debian-12-amd64-*",
+    "owners": ["136693071363"],
+    "ssh_user": "admin",
+    "note": "Debian 12 (official account 136693071363)."
+  },
+  "debian-13": {
+    "name_pattern": "debian-13-amd64-*",
+    "owners": ["136693071363"],
+    "ssh_user": "admin",
+    "note": "Debian 13 trixie (official account 136693071363). Name pattern debian-13-amd64-<date>-<rev>; root device /dev/xvda; rejects ED25519 keys (RSA injection)."
+  },
+  "rocky": {
+    "name_pattern": "Rocky-9-EC2-Base-*x86_64*",
+    "owners": ["679593333241"],
+    "ssh_user": "rocky",
+    "note": "Rocky Linux 9 (official account 679593333241)."
+  },
+  "fedora": {
+    "name_pattern": "Fedora-Cloud-Base-AmazonEC2.x86_64-43-*",
+    "owners": ["125523088429"],
+    "ssh_user": "fedora",
+    "note": "Fedora Cloud Base release 43 (official account 125523088429). Image names are Fedora-Cloud-Base-AmazonEC2.x86_64-<release>-<build>.0; bump the release number each cycle."
+  },
+  "rhel": {
+    "name_pattern": "RHEL-9.*.0_HVM-*-x86_64-*",
+    "owners": ["309956199498"],
+    "ssh_user": "ec2-user",
+    "note": "RHEL 9 (AWS-published account 309956199498, free hourly images - no Marketplace opt-in needed)."
+  },
+  "rhel-10": {
+    "name_pattern": "RHEL-10.*.0_HVM-*-x86_64-*",
+    "owners": ["309956199498"],
+    "ssh_user": "ec2-user",
+    "note": "RHEL 10 (AWS-published account 309956199498, free hourly images). Verified: rejects ED25519 keys - build passes an RSA keypair."
+  },
+  "almalinux": {
+    "name_pattern": "AlmaLinux OS 9.* x86_64*",
+    "owners": ["679593333241"],
+    "ssh_user": "ec2-user",
+    "note": "AlmaLinux 9 (official account 679593333241). Marketplace - subscribe once (SKU 3kukoxmnoighcsbjd0u4nq9ds). Current images use ssh user ec2-user and reject ED25519 keys."
+  },
+  "almalinux-10": {
+    "name_pattern": "AlmaLinux OS 10.* x86_64*",
+    "owners": ["679593333241"],
+    "ssh_user": "ec2-user",
+    "note": "AlmaLinux 10 (official account 679593333241), verified ec2-user + RSA-only. Marketplace - subscribe once (SKU 3kukoxmnoighcsbjd0u4nq9ds)."
+  },
+  "rocky-10": {
+    "name_pattern": "Rocky-10-EC2-Base-*x86_64*",
+    "owners": ["679593333241"],
+    "ssh_user": "rocky",
+    "note": "Rocky Linux 10 (official account 679593333241). Marketplace - subscribe once (SKU 7istt4u6drf5udz02zdppptuy). ssh_user 'rocky' assumed (verify at build - could not launch pending opt-in)."
+  },
+  "other": {
+    "name_pattern": "",
+    "owners": [],
+    "ssh_user": "",
+    "note": "'other' builds require an explicit AMI ID or image name passed at build time."
+  }
+}
