@@ -75,14 +75,22 @@ else
   echo "  Open port 8080 in your EC2 Security Group before accessing."
 fi
 
-# ---- 5. Generate a random admin password ----
-ADMIN_PASSWORD="$(openssl rand -hex 16)"
+# ---- 5. Admin password ----
+# The app only sets admin's password on FIRST boot (persistent volume).
+# Reuse a previous .env's password on re-runs so the printed login always works.
 mkdir -p "$APP_DIR"
-cat > "$APP_DIR/.env" <<ENVEOF
+if [ -f "$APP_DIR/.env" ]; then
+  echo "  Reusing existing .env (data volume keeps its admin password)."
+  # shellcheck disable=SC1091
+  . "$APP_DIR/.env"
+else
+  ADMIN_PASSWORD="$(openssl rand -hex 16)"
+  cat > "$APP_DIR/.env" <<ENVEOF
 ADMIN_USER=admin
 ADMIN_PASSWORD=${ADMIN_PASSWORD}
 ENVEOF
-chmod 600 "$APP_DIR/.env"
+  chmod 600 "$APP_DIR/.env"
+fi
 
 # ---- 6. Run the container ----
 echo "==> Starting container..."
