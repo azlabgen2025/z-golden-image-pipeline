@@ -30,8 +30,17 @@ def verify_connection(token, repo):
                 "error": (
                     "GitHub API 404: repo or workflow not found. The fine-grained "
                     "token needs BOTH 'Actions: read and write' and 'Metadata: "
-                    "read-only', and the repo must be '<username>/<fork-name>' "
-                    "exactly (e.g. alice/golden-image-pipeline)."
+                    "read-only', AND the repo string must match the token's "
+                    "'Repository access' selection exactly. Check: (1) repo field "
+                    "is '<username>/<fork-name>' (not the original azlabgen2025 "
+                    "repo, no leading https://), (2) the token was generated with "
+                    "That same fork selected under 'Only select repositories', "
+                    "(3) the fork has Actions enabled (fork → Settings → Actions → "
+                    "'Enable GitHub Actions'). If it still fails, run this and "
+                    "share the response:  curl -s -H 'Authorization: Bearer "
+                    "<GITHUB_PAT>' -H 'Accept: application/vnd.github+json' "
+                    "https://api.github.com/repos/<username>/<fork-name>"
+                    "/actions/workflows/build-image.yml"
                 ),
             }
         return {"ok": False, "error": f"GitHub API {resp.status_code}: {resp.json().get('message', resp.text[:200])}"}

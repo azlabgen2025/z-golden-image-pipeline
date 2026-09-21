@@ -84,9 +84,25 @@ aws configure    # enter an IAM user access key + secret + region
    - Click **Generate token**, copy the `github_pat_...` value once — it is shown
      only once — and save it somewhere safe. This token is what the web UI uses to
      dispatch builds (see [Ways to run the app](#ways-to-run-the-app), below).
-   - **Connect GitHub shows `404`?** Double-check both permissions above and that
-     the repo field matches exactly `<YOUR_GITHUB_USERNAME>/golden-image-pipeline`
-     (your fork — not `azlabgen2025/z-golden-image-pipeline`).
+   - **Connect GitHub shows `404`?** Work through these in order:
+     1. Both token permissions are set: **Actions = Read and write** and
+        **Metadata = Read-only**.
+     2. The token's **Repository access** has your **fork** selected — the app's
+        repo field must be `<YOUR_GITHUB_USERNAME>/golden-image-pipeline`
+        (not `azlabgen2025/z-golden-image-pipeline`, no `https://`).
+     3. **Actions is enabled on your fork.** Forks often come with Actions off:
+        open the fork in GitHub → **Actions** tab → if asked, choose
+        **Enable GitHub Actions** (or fork → **Settings** → **Actions** → General
+        → ensure Actions are allowed).
+     4. Still 404? Diagnose directly:
+        ```bash
+        curl -s -H "Authorization: Bearer <GITHUB_PAT>" \
+             -H "Accept: application/vnd.github+json" \
+             https://api.github.com/repos/<username>/golden-image-pipeline/actions/workflows/build-image.yml
+        ```
+        - `200` OK → the pipe works; the app just needs the exact same string
+        - `404` → none of the above; confirm the token has the fork selected
+        - `403`/`401` → token scope/permissions problem
 
 ### 1. AWS Setup
 
