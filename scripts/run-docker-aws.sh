@@ -43,6 +43,7 @@ docker rm -f golden-image-pipeline 2>/dev/null || true
 # ---- 4. Certs (optional --https mode) ----
 CERT_OPTS=()
 PORT_MAP="-p 8080:8080"
+HOST_PORT=8080
 PROTOCOL="http"
 if [ "$HTTPS_FLAG" = "--https" ]; then
   echo "==> Generating self-signed cert for $PUBLIC_IP (HTTPS mode)..."
@@ -67,6 +68,7 @@ EOF
   chmod 600 "$KEY"
   CERT_OPTS=(-v "$APP_DIR/certs:/app/certs:ro")
   PORT_MAP="-p 443:8080"
+  HOST_PORT=443
   PROTOCOL="https"
   echo "  Open port 443 in your EC2 Security Group before accessing."
 else
@@ -98,7 +100,7 @@ echo
 echo "=================================================="
 echo "  Golden Image Pipeline — running on $PUBLIC_IP"
 echo
-echo "  URL:   ${PROTOCOL}://${PUBLIC_IP}${PORT_MAP%%:*}"
+echo "  URL:   ${PROTOCOL}://${PUBLIC_IP}:${HOST_PORT}"
 echo "  Login: admin / $ADMIN_PASSWORD"
 echo
 echo "  Health: curl -sk ${PROTOCOL}://${PUBLIC_IP}/api/health"
