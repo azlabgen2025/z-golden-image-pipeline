@@ -24,6 +24,16 @@ def verify_connection(token, repo):
         resp = requests.get(url, headers=_headers(token), timeout=15)
         if resp.status_code == 200:
             return {"ok": True, "repo": repo}
+        if resp.status_code == 404:
+            return {
+                "ok": False,
+                "error": (
+                    "GitHub API 404: repo or workflow not found. The fine-grained "
+                    "token needs BOTH 'Actions: read and write' and 'Metadata: "
+                    "read-only', and the repo must be '<username>/<fork-name>' "
+                    "exactly (e.g. alice/golden-image-pipeline)."
+                ),
+            }
         return {"ok": False, "error": f"GitHub API {resp.status_code}: {resp.json().get('message', resp.text[:200])}"}
     except Exception as e:
         return {"ok": False, "error": str(e)}

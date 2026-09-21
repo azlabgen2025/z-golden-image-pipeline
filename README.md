@@ -68,15 +68,25 @@ aws configure    # enter an IAM user access key + secret + region
    git push -u origin main
    ```
 2. **Create a fine-grained Personal Access Token** — this is what the web UI
-   uses to dispatch builds:
+   uses to dispatch builds. It needs **two** permissions, both listed under
+   **Permissions → Repository permissions**:
+   - **Actions** = **Read and write** (lets the app trigger workflow runs)
+   - **Metadata** = **Read-only** — the GitHub API *requires* this for the
+     token to even see the repo; **if it's missing (or "No access") you will get
+     `404 Not Found` on Connect GitHub**, even though the repo URL is correct
+   Full walkthrough:
    - GitHub → **Settings** (your avatar, top-right) → **Developer settings**
    - **Personal access tokens** → **Fine-grained tokens** → **Generate new token**
    - Give it a name (e.g. `golden-image-builds`), set an expiry, then under
      **Repository access** choose **Only select repositories** → pick your new repo
-   - Under **Permissions → Repository permissions → Actions** set **Read and write**
+   - Under **Permissions → Repository permissions**, set **Actions = Read and
+     write** and **Metadata = Read-only**
    - Click **Generate token**, copy the `github_pat_...` value once — it is shown
      only once — and save it somewhere safe. This token is what the web UI uses to
      dispatch builds (see [Ways to run the app](#ways-to-run-the-app), below).
+   - **Connect GitHub shows `404`?** Double-check both permissions above and that
+     the repo field matches exactly `<YOUR_GITHUB_USERNAME>/golden-image-pipeline`
+     (your fork — not `azlabgen2025/z-golden-image-pipeline`).
 
 ### 1. AWS Setup
 
