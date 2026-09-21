@@ -233,7 +233,30 @@ def _aws_status(user):
             "account_name": account["name"],
             "message": "Connected",
         }
-    return {"connected": False, "account_name": account["name"], "error": ident["error"], "message": "Credentials invalid"}
+    return {
+        "connected": False,
+        "account_name": account["name"],
+        "error": ident["error"],
+        "message": _aws_error_hint(ident["error"]),
+    }
+
+
+def _aws_error_hint(error_text):
+    """Map a raw boto3/STS error to a plain-language fix."""
+    e = (error_text or "").lower()
+    if "invalidclienttokenid" in e or "signaturedoesnotmatch" in e:
+        return ("Credentials are wrong or were deleted. Re-create the access key "
+                "in AWS (IAM → user → Security credentials → Create access key) "
+                "and paste the new Access Key ID + Secret. Access Key IDs start "
+                "with 'AKIA'.")
+    if "accessdenied" in e or "not authorized" in e or "unauthorized" in e:
+        return ("The key is valid but the IAM user lacks permission. Create the "
+                "key for a user with AdministratorAccess (as in Quick Start step 1a).")
+    if "mfa" in e:
+        return "Your IAM user requires MFA for programmatic calls — the access key alone isn't enough. Use a user without an MFA-for-API policy, or scope its permissions down."
+    if ("not enabled" in e) and ("region" in e or "us-east-1" in e):
+        return "Check the region field — the app can't reach AWS in that region. It should be e.g. us-east-1."
+    return f"Credentials are invalid: {error_text}"
 
 
 def _github_status(user):
@@ -466,6 +489,21 @@ def api_aws_accounts():
     role_arn = (data.get("role_arn") or "").strip()
     if not name or not access_key or not secret_key:
         return jsonify({"status": "error", "message": "Account name, Access Key, and Secret Key are required"}), 400
+
+    # Validate the keys BEFORE storing, so an account can't be saved as
+    # "active" with invalid credentials.
+    test = aws_utils.account_identity({
+        "access_key_enc": encrypt_secret(access_key),
+        "secret_key_enc": encrypt_secret(secret_key),
+        "region": region,
+    })
+    if not test["ok"]:
+        hint = _aws_error_hint(test["error"])
+        return jsonify({
+            "status": "error",
+            "message": hint,
+            "error": test["error"],
+        }), 400
 
     account_id = db.add_aws_account(
         user["id"], name, encrypt_secret(access_key), encrypt_secret(secret_key), region, role_arn
