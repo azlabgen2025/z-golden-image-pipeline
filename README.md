@@ -67,13 +67,36 @@ aws configure    # enter an IAM user access key + secret + region
    git remote add origin https://github.com/<YOU>/golden-image-pipeline.git
    git push -u origin main
    ```
-2. **Create a fine-grained Personal Access Token** with `Actions: read/write`
-   (repo scope). GitHub → Settings → Developer settings → Fine-grained tokens →
-   Repository access (your new repo) → Permissions → Repository permissions →
-**Actions** = Read and write. This token is what the web UI uses to dispatch
-    builds (see [Ways to run the app](#ways-to-run-the-app), below).
+2. **Create a fine-grained Personal Access Token** — this is what the web UI
+   uses to dispatch builds:
+   - GitHub → **Settings** (your avatar, top-right) → **Developer settings**
+   - **Personal access tokens** → **Fine-grained tokens** → **Generate new token**
+   - Give it a name (e.g. `golden-image-builds`), set an expiry, then under
+     **Repository access** choose **Only select repositories** → pick your new repo
+   - Under **Permissions → Repository permissions → Actions** set **Read and write**
+   - Click **Generate token**, copy the `github_pat_...` value once — it is shown
+     only once — and save it somewhere safe. This token is what the web UI uses to
+     dispatch builds (see [Ways to run the app](#ways-to-run-the-app), below).
 
 ### 1. AWS Setup
+
+**1a. Create an IAM user + access key (needed for `aws configure`):**
+
+- AWS Console → **IAM** → **Users** → **Create user** (name e.g. `golden-admin`)
+- Attach **AdministratorAccess** to it (simplest for a personal account; scope it
+  down if you prefer least-privilege)
+- Open the user → **Security credentials** → **Create access key** (use case:
+  *Command Line Interface*) → copy the **Access key ID** and **Secret access key**
+- Configure it here [on the machine you run setup from]:
+  ```bash
+  aws configure
+  #   AWS Access Key ID: <paste>
+  #   AWS Secret Access Key: <paste>
+  #   Default region name: us-east-1
+  #   Default output format: json
+  ```
+
+**1b. Run the IAM/OIDC setup script:**
 
 ```bash
 cd scripts
@@ -86,19 +109,20 @@ forked repo name (e.g. `alice` and `golden-image-pipeline`) — these become the
 OIDC trust condition, so enter your **fork**, not this repository.
 
 This creates:
-- IAM role `GitHubActionsPackerRole` with OIDC trust
-- IAM policy for EC2/S3 access
-- Prints the secrets to add to GitHub
+- IAM role `GitHubActionsPackerRole` with an OIDC trust to your GitHub repo
+- IAM policy `GoldenImagePackerPolicy` (EC2/S3/PassRole access for builds)
+- Prints the role ARN to paste as a GitHub secret
 
 ### 2. GitHub Secrets
 
-Add to repo → Settings → Secrets and variables → Actions:
+**2a. Add the AWS role ARN as a secret:**
 
-| Secret | Value |
-|--------|-------|
-| `AWS_ROLE_TO_ASSUME` | ARN from setup script |
+- GitHub → your forked repo → **Settings** → **Secrets and variables** → **Actions**
+- **New repository secret**
+- Name: `AWS_ROLE_TO_ASSUME` — Value: the ARN printed by `setup-aws.sh`
+  (looks like `arn:aws:iam::123456789012:role/GitHubActionsPackerRole`)
 
-**Then generate the golden SSH keypair and add both halves:**
+**2b. Generate the golden SSH keypair and add both halves:**
 
 ```bash
 # 1. Generate your OWN keypair (never reuse someone else's)
@@ -110,7 +134,7 @@ git add ansible/base/vars/golden_user.pub
 git commit -m "Bake own golden SSH key into base images"
 git push
 
-# 3. Add the PRIVATE key as a GitHub secret:
+# 3. Add the PRIVATE key as the second GitHub secret:
 #    repo → Settings → Secrets and variables → Actions → New repository secret
 #    Name: GOLDEN_SSH_PRIVATE_KEY   Value: paste the contents of golden (the file, not .pub)
 ```
@@ -128,7 +152,22 @@ The `AWS_ROLE_TO_ASSUME` role is what the GitHub Actions workflow assumes
 secret. If you skip `GOLDEN_SSH_PRIVATE_KEY`, base builds still work; the
 connection key is only used by the customized (layered) build job.
 
-### 3. Local Build Test
+### 3. Credentials to enter in the web app
+
+Once the app is running you paste these into **Settings/Connect AWS** and
+**Settings/Connect GitHub** (they are stored Fernet-encrypted at rest):
+
+| Where in the app | What to paste | Where you created it |
+|------------------|---------------|----------------------|
+| **Connect AWS** → access key ID | `AKIA...` | Step 1a → user's **Security credentials** → **Create access key** |
+| **Connect AWS** → secret access key | `...` | same as above (shown once) |
+| **Connect AWS** → region | `us-east-1` | same as above |
+| **Connect GitHub** → token | `github_pat_...` | Step 0 → **Fine-grained token** (Actions read/write) |
+| **Connect GitHub** → repo | `<YOU>/golden-image-pipeline` | your fork |
+
+Keep these in your password manager — the app shows them only once when you save.
+
+### 4. Local Build Test
 
 ```bash
 # Requires valid AWS credentials in ~/.aws
@@ -136,7 +175,7 @@ connection key is only used by the customized (layered) build job.
 ./scripts/packer-build.sh ubuntu shared          # any of the 5 OS
 ```
 
-### 4. Trigger via GitHub Actions
+### 5. Trigger via GitHub Actions
 
 - **Push to main** → auto-builds base image (Amazon Linux by default)
 - **Manual trigger** → `Actions` tab → `Build Golden Image` → `Run workflow`
@@ -158,7 +197,7 @@ Production-grade Flask web app with multi-user auth, per-user AWS/GitHub credent
 > you must do the [Quick Start](#quick-start) steps **0–2** above once —
 > they set up the GitHub repo + token, the AWS IAM/OIDC role, and the repo
 > secrets. Those steps are the **same for Method 1, 2, and 3**; they are not
-> method-specific. Steps **3–4** (local build test / manual trigger) are
+> method-specific. Steps **4–5** (local build test / manual trigger) are
 > optional extras you can skip.
 
 Same app, three ways. After the common Quick Start above, run it as:
