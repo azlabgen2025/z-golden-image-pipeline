@@ -156,7 +156,42 @@ Security notes:
 
 ### Method 2: Docker toolbox
 
-The image contains the **whole pipeline toolchain**, not just the web app:
+Two paths — **fastest (no repo needed): run the prebuilt image**. Best for a stock
+EC2 box or any machine with Docker, e.g. your friend's bare Ubuntu instance.
+
+**Fastest — prebuilt image (no build, no clone):**
+
+```bash
+# On the box: install Docker once, then pull & run — that's it.
+# First run the one-command script (installs docker + compose, pulls image, starts app):
+#   HTTP on 8080:
+./scripts/run-docker-aws.sh <public-ip-or-dns>
+#   HTTPS on 443 (self-signed cert):
+./scripts/run-docker-aws.sh <public-ip-or-dns> --https
+```
+
+Or pull & run the image directly:
+
+```bash
+apt-get update && apt-get install -y docker.io docker-compose-v2
+docker pull ghcr.io/azlabgen2025/z-golden-image-pipeline:latest
+docker run -d --name golden-image-pipeline --restart unless-stopped \
+  -p 443:8080 \
+  -v golden-image-data:/app/data \
+  ghcr.io/azlabgen2025/z-golden-image-pipeline:latest
+```
+
+- This image is built automatically on every push to `main` (workflow
+  `publish-image.yml`) — no Docker build on your box.
+- **Security Group gotcha (EC2):** the default SG only allows SSH (22). To reach the
+  app you must also open **8080 (HTTP)** or **443 (HTTPS)** in the instance's
+  security group before accessing — the #1 reason fresh EC2 docker deployments
+  "don't work".
+- The prebuilt image is public — pulls need no login.
+
+**Source build (full toolbox, needs the repo):**
+
+The image built from source contains the **whole pipeline toolchain**, not just the web app:
 Flask app served by **gunicorn**, plus **AWS CLI v2**, **Packer 1.10.0**, **Ansible**,
 **git**, **ssh**, and **jq** — so you can drive builds and run AWS/Packer/Ansible
 directly from inside the container.
@@ -168,7 +203,7 @@ docker run -d --name golden-image-pipeline -p 8080:8080 \
   -v $(pwd)/certs:/app/certs:ro \
   -v golden-image-data:/app/data \
   -v ~/.aws:/root/.aws:ro \
-  golden-image-pipeline:latest
+  ghcr.io/azlabgen2025/z-golden-image-pipeline:latest
 ```
 
 - **Access**: `https://localhost:8080` — or from any machine on your LAN via the
@@ -334,6 +369,7 @@ web/
 scripts/
     ├── setup-aws.sh        # IAM/OIDC setup
     ├── setup-ec2.sh        # one-shot EC2 demo deploy (clone→certs→.env→compose)
+    ├── run-docker-aws.sh   # pull-and-run prebuilt GHCR image (no build/clone)
     ├── packer-build.sh     # local build helper
     ├── gen-cert.sh         # self-signed TLS cert generator
     ├── run-web.sh          # run app (local/docker), auto-enables HTTPS
