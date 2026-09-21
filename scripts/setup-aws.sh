@@ -1,12 +1,19 @@
 #!/bin/bash
 # Copyright (c) 2026 Deepesh Rajpal. Licensed under the Mozilla Public License 2.0 (MPL-2.0).
+# Usage: ./setup-aws.sh [REGION] [GITHUB_ORG] [GITHUB_REPO]
 set -euo pipefail
 
 REGION="${1:-us-east-1}"
 ROLE_NAME="GitHubActionsPackerRole"
 POLICY_NAME="GoldenImagePackerPolicy"
-GITHUB_ORG="YOUR_GITHUB_ORG"
-GITHUB_REPO="YOUR_GITHUB_REPO"
+
+read -r -p "GitHub organisation or username where the workflow repo lives: " GITHUB_ORG
+read -r -p "Workflow repo name: " GITHUB_REPO
+
+[ -n "$GITHUB_ORG" ] && [ -n "$GITHUB_REPO" ] || {
+  echo "ERROR: both GitHub org and repo are required." >&2
+  exit 1
+}
 
 echo "Creating IAM policy..."
 POLICY_DOC=$(cat <<EOF
