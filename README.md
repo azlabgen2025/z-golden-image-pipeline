@@ -24,7 +24,34 @@ Web UI (Flask) --> GitHub Actions --> Packer --> EC2 (t2.micro / t3.small) --> A
 
 - AWS account (any tier — builds run on `t2.micro`, mostly within the Free Tier)
 - GitHub account (a fresh repo is fine — everything is in this repository)
-- AWS CLI + `git` installed locally for the one-time IAM/OIDC setup
+- **`git` and the AWS CLI v2** installed on any machine you run the one-time
+  setup from (your laptop or a fresh Ubuntu VM — see below)
+
+**Install `git` + AWS CLI v2 on a fresh Ubuntu VM** (skip if already present):
+
+```bash
+sudo apt-get update && sudo apt-get install -y git unzip curl
+curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip -o awscliv2.zip && sudo ./aws/install
+aws --version     # e.g. aws-cli/2.x
+git --version
+```
+
+**On macOS:**
+
+```bash
+xcode-select --install                    # provides git
+curl -s "https://awscli.amazonaws.com/AWSCLIV2.pkg" -o "AWSCLIV2.pkg"
+sudo installer -pkg AWSCLIV2.pkg -target /
+aws --version && git --version
+```
+
+Then configure one-time credentials for the setup step (do **not** reuse these
+keys for builds — builds use the GitHub OIDC role, not access keys):
+
+```bash
+aws configure    # enter an IAM user access key + secret + region
+```
 
 ## Quick Start (common setup for all run methods)
 
@@ -54,12 +81,14 @@ chmod +x setup-aws.sh
 ./setup-aws.sh us-east-1
 ```
 
+The script will **prompt you** for your GitHub organisation/username and the
+forked repo name (e.g. `alice` and `golden-image-pipeline`) — these become the
+OIDC trust condition, so enter your **fork**, not this repository.
+
 This creates:
 - IAM role `GitHubActionsPackerRole` with OIDC trust
 - IAM policy for EC2/S3 access
 - Prints the secrets to add to GitHub
-
-**Edit before running:** set `GITHUB_ORG` and `GITHUB_REPO` at the top of `scripts/setup-aws.sh`.
 
 ### 2. GitHub Secrets
 
@@ -68,7 +97,30 @@ Add to repo → Settings → Secrets and variables → Actions:
 | Secret | Value |
 |--------|-------|
 | `AWS_ROLE_TO_ASSUME` | ARN from setup script |
-| `GOLDEN_SSH_PRIVATE_KEY` | An SSH private key (RSA or ED25519) that Packer uses to connect during customized builds — generate one with `ssh-keygen -t ed25519 -f golden -N ""` and paste the **private** key here |
+
+**Then generate the golden SSH keypair and add both halves:**
+
+```bash
+# 1. Generate your OWN keypair (never reuse someone else's)
+ssh-keygen -t rsa -b 2048 -f golden -N ""
+
+# 2. Bake YOUR public key into the repo (replaces the bundled demo key)
+cp golden.pub ansible/base/vars/golden_user.pub
+git add ansible/base/vars/golden_user.pub
+git commit -m "Bake own golden SSH key into base images"
+git push
+
+# 3. Add the PRIVATE key as a GitHub secret:
+#    repo → Settings → Secrets and variables → Actions → New repository secret
+#    Name: GOLDEN_SSH_PRIVATE_KEY   Value: paste the contents of golden (the file, not .pub)
+```
+
+Why this step matters: every base image has the key `ansible/base/vars/golden_user.pub`
+burned into the standard `ec2-user` account. The customized (layered) build job connects
+to those images by SSH, so the private key you add as `GOLDEN_SSH_PRIVATE_KEY` **must be
+the exact counterpart of that public key**. If you skip step 2, your custom builds will
+fail to connect (the image only trusts the bundled key, which you don't own). Base-only
+builds work without this secret.
 
 The `AWS_ROLE_TO_ASSUME` role is what the GitHub Actions workflow assumes
 (OIDC) to build AMIs in your AWS account. The web UI can also pass a

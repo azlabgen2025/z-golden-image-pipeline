@@ -4,7 +4,7 @@
 # One-shot deployer for the golden-image-pipeline web app on a fresh EC2 box.
 # Installs Docker + Compose, clones the repo (public URL), generates a self-signed
 # TLS cert for the box's public IP/hostname, writes a secure .env, and starts the
-# container. Designed for a short-lived demo instance.
+# container.
 #
 # Usage on Ubuntu 24.04:
 #   ssh ubuntu@<box-ip> 'bash -s' < scripts/setup-ec2.sh <repo-url> <public-ip-or-dns>
@@ -16,9 +16,9 @@
 #   * log in with admin / <ADMIN_PASSWORD shown in /opt/golden-image-pipeline/.env>
 #   * add your AWS account + GitHub connection in the app's Settings, then build
 #
-# Stop the demo safely (reduces billing to ~$0 while idle):
+# Stop the box when not in use (reduces billing to ~$0 while idle):
 #   docker compose stop      # container stopped, data volume preserved
-#   docker compose start     # bring it back up for the next demo
+#   docker compose start     # bring it back up later
 set -euo pipefail
 
 REPO_URL="${1:-}"
