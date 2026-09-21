@@ -113,11 +113,70 @@ Same app, three ways. After the common Quick Start above, run it as:
 
 | Method | Best when | Run instructions |
 |--------|-----------|------------------|
-| 1. **EC2 instance** | you want it hosted in the cloud with a public URL — the recommended option, ideal for demos and sharing | [☞ Method 1 — EC2 instance](#method-1-ec2-instance) |
-| 2. **Docker toolbox** | running the whole Packer/Ansible/AWS toolchain in one container on your machine | [☞ Method 2 — Docker toolbox](#method-2-docker-toolbox) |
+| 1. **Docker (container)** | you want it running in minutes, anywhere containers run (Docker/Podman/LXD) — no repo, no build, no VM — the recommended option | [☞ Method 1 — Docker](#method-1-docker-recommended) |
+| 2. **EC2 instance** | you want it hosted in the cloud with a public URL — ideal for demos and sharing | [☞ Method 2 — EC2 instance](#method-2-ec2-instance) |
 | 3. **Local Python** | fast development and quick checks without containers | [☞ Method 3 — Local Python](#method-3-local-python) |
 
-### Method 1: EC2 instance
+### Method 1: Docker (recommended)
+
+Run the **prebuilt container image** — no repo, no build, no VM setup, no config
+files. It's a standard OCI image, so it runs anywhere containers run: **Docker,
+Podman, containerd (CRI-O), and LXD (LXC)**.
+
+**Out of the box — just pull & run (zero config, defaults work):**
+
+```bash
+docker run -d --name golden-image-pipeline --restart unless-stopped \
+  -p 8080:8080 \
+  -v golden-image-data:/app/data \
+  ghcr.io/azlabgen2025/z-golden-image-pipeline:latest
+```
+
+That's it — pull and run. Open `http://localhost:8080` (or `http://<host-ip>:8080`)
+and log in with `admin` / `admin`. The image:
+
+- **Defaults to plain HTTP on port 8080** with `admin`/`admin` login (change the
+  password via the **Password** menu after first login).
+- **HTTPS is automatic** when you mount certs at `/app/certs` (generate once with
+  `./scripts/gen-cert.sh certs ...` for your IP/hostname).
+- **Data persists** in the named `golden-image-data` volume (SQLite DB + encryption key).
+- Contains the **whole pipeline toolchain** (AWS CLI v2, Packer, Ansible, git, ssh, jq),
+  so you can drive `aws`/`packer`/`ansible` from inside the container.
+- Is **public** — pulls need no login.
+- Is rebuilt automatically on every push to `main` (workflow `publish-image.yml`).
+
+**One-command helper (VMs/EC2/LAN with a public IP):**
+
+```bash
+# Installs Docker once, pulls the image, and starts it on a public IP:
+#   HTTP on 8080:
+curl -fsSL https://raw.githubusercontent.com/azlabgen2025/z-golden-image-pipeline/main/scripts/run-docker-aws.sh | sudo bash -s <public-ip-or-dns>
+#   HTTPS on 443 (self-signed cert):
+curl -fsSL https://raw.githubusercontent.com/azlabgen2025/z-golden-image-pipeline/main/scripts/run-docker-aws.sh | sudo bash -s <public-ip-or-dns> --https
+```
+
+**Security Group gotcha (any cloud VM):** default security groups only open SSH (22).
+To reach the app you must also open **8080 (HTTP)** or **443 (HTTPS)** — the #1
+reason fresh VM or EC2 container deployments "don't work".
+
+**(Optional) Source build — full toolbox, needs the repo:**
+
+```bash
+docker compose up -d --build            # or: ./scripts/run-web.sh docker
+```
+
+- **Access**: `https://localhost:8080` — or from any machine on your LAN via the
+  **host machine's IP**: `https://<host-ip>:8080` (e.g. `https://192.168.1.216:8080`).
+  Change the host port with `APP_PORT=9090 docker compose up -d`.
+- **HTTPS** is automatic when `certs/tls.crt`+`certs/tls.key` are present (the
+  `./certs` volume) — plain `http://` otherwise.
+- **Data** (SQLite DB + encryption key) persists in the `golden-image-data` volume.
+- **AWS creds** from `~/.aws` are mounted read-only so `aws`, `packer`, and `ansible`
+  work inside the container. Mount `.` at `/workspace` (read-only) to run ad-hoc
+  `packer validate` / `ansible-playbook --syntax-check` against the repo.
+- **Health**: `GET /api/health` → `{"status":"ok"}` (also the container HEALTHCHECK).
+
+### Method 2: EC2 instance
 
 The web UI is the control plane: you log in, paste the AWS account + GitHub
 token into the app's Settings, and it dispatches real builds to GitHub Actions.
@@ -153,69 +212,6 @@ Security notes:
 - Use a dedicated security group open only to the ports you need (443 or 22), ideally
   source-restricted to your office/company IP range.
 - The default admin password is random per deploy (from `.env`). Change it in the app once logged in.
-
-### Method 2: Docker toolbox
-
-Two paths — **fastest (no repo needed): run the prebuilt image**. Best for a stock
-EC2 box or any machine with Docker, e.g. your friend's bare Ubuntu instance.
-
-**Fastest — prebuilt image (no build, no clone):**
-
-```bash
-# On the box: install Docker once, then pull & run — that's it.
-# First run the one-command script (installs docker + compose, pulls image, starts app):
-#   HTTP on 8080:
-./scripts/run-docker-aws.sh <public-ip-or-dns>
-#   HTTPS on 443 (self-signed cert):
-./scripts/run-docker-aws.sh <public-ip-or-dns> --https
-```
-
-Or pull & run the image directly:
-
-```bash
-apt-get update && apt-get install -y docker.io docker-compose-v2
-docker pull ghcr.io/azlabgen2025/z-golden-image-pipeline:latest
-docker run -d --name golden-image-pipeline --restart unless-stopped \
-  -p 443:8080 \
-  -v golden-image-data:/app/data \
-  ghcr.io/azlabgen2025/z-golden-image-pipeline:latest
-```
-
-- This image is built automatically on every push to `main` (workflow
-  `publish-image.yml`) — no Docker build on your box.
-- **Security Group gotcha (EC2):** the default SG only allows SSH (22). To reach the
-  app you must also open **8080 (HTTP)** or **443 (HTTPS)** in the instance's
-  security group before accessing — the #1 reason fresh EC2 docker deployments
-  "don't work".
-- The prebuilt image is public — pulls need no login.
-
-**Source build (full toolbox, needs the repo):**
-
-The image built from source contains the **whole pipeline toolchain**, not just the web app:
-Flask app served by **gunicorn**, plus **AWS CLI v2**, **Packer 1.10.0**, **Ansible**,
-**git**, **ssh**, and **jq** — so you can drive builds and run AWS/Packer/Ansible
-directly from inside the container.
-
-```bash
-docker compose up -d --build            # or: ./scripts/run-web.sh docker
-# or raw docker (mount certs + data + your AWS creds + optionally the repo):
-docker run -d --name golden-image-pipeline -p 8080:8080 \
-  -v $(pwd)/certs:/app/certs:ro \
-  -v golden-image-data:/app/data \
-  -v ~/.aws:/root/.aws:ro \
-  ghcr.io/azlabgen2025/z-golden-image-pipeline:latest
-```
-
-- **Access**: `https://localhost:8080` — or from any machine on your LAN via the
-  **host machine's IP**: `https://<host-ip>:8080` (e.g. `https://192.168.1.216:8080`).
-  Change the host port with `APP_PORT=9090 docker compose up -d`.
-- **HTTPS** is automatic when `certs/tls.crt`+`certs/tls.key` are present (the
-  `./certs` volume) — plain `http://` otherwise.
-- **Data** (SQLite DB + encryption key) persists in the `golden-image-data` volume.
-- **AWS creds** from `~/.aws` are mounted read-only so `aws`, `packer`, and `ansible`
-  work inside the container. Mount `.` at `/workspace` (read-only) to run ad-hoc
-  `packer validate` / `ansible-playbook --syntax-check` against the repo.
-- **Health**: `GET /api/health` → `{"status":"ok"}` (also the container HEALTHCHECK).
 
 ### Method 3: Local Python
 
