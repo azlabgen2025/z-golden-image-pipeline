@@ -43,8 +43,8 @@ Web UI (Flask) --> GitHub Actions --> Packer --> EC2 (t2.micro / t3.small) --> A
 2. **Create a fine-grained Personal Access Token** with `Actions: read/write`
    (repo scope). GitHub → Settings → Developer settings → Fine-grained tokens →
    Repository access (your new repo) → Permissions → Repository permissions →
-   **Actions** = Read and write. This token is what the web UI uses to dispatch
-   builds (see "Deploy the web UI", below).
+**Actions** = Read and write. This token is what the web UI uses to dispatch
+    builds (see [Ways to run the app](#ways-to-run-the-app), below).
 
 ### 1. AWS Setup
 
@@ -114,7 +114,7 @@ Same app, three ways. After the common Quick Start above, run it as:
 | Method | Best when | Run instructions |
 |--------|-----------|------------------|
 | 1. **Docker (container)** | you want it running in minutes, anywhere containers run (Docker/Podman/LXD) — no repo, no build, no VM — the recommended option | [☞ Method 1 — Docker](#method-1-docker-recommended) |
-| 2. **EC2 instance** | you want it hosted in the cloud with a public URL — ideal for demos and sharing | [☞ Method 2 — EC2 instance](#method-2-ec2-instance) |
+| 2. **EC2 instance** | you want it hosted in the cloud with a public URL, reachable from anywhere | [☞ Method 2 — EC2 instance](#method-2-ec2-instance) |
 | 3. **Local Python** | fast development and quick checks without containers | [☞ Method 3 — Local Python](#method-3-local-python) |
 
 ### Method 1: Docker (recommended)
@@ -200,8 +200,9 @@ Then:
 - Health check: `curl -sk https://<box-ip>/api/version`
 - Log in as `admin` / the password printed by the script
 - In **Settings/Connect AWS**: add an AWS account (access key + secret, region) — these are stored
-  Fernet-encrypted at rest; create the access keys in the AWS account you built the golden images in
-- In **Settings/Connect GitHub**: paste the PAT (Actions scope) + `YOU/golden-image-pipeline`
+  Fernet-encrypted at rest; create the access keys in the AWS account where the golden images
+  will be built
+- In **Settings/Connect GitHub**: paste a PAT (Actions scope) + `YOU/golden-image-pipeline`
 - Dispatch a build from **Section 1** (base) or **Section 2** (customized) and watch it live in
   **Build Jobs**
 
@@ -210,7 +211,7 @@ Security notes:
   `docker compose start` resumes it). Stopping the **EC2 instance itself** also works
   (`aws ec2 stop-instances` or the console), and it starts again on demand.
 - Use a dedicated security group open only to the ports you need (443 or 22), ideally
-  source-restricted to your office/company IP range.
+  source-restricted to your own trusted IP ranges.
 - The default admin password is random per deploy (from `.env`). Change it in the app once logged in.
 
 ### Method 3: Local Python
@@ -258,7 +259,7 @@ restart policy, and optional TLS. Remaining gaps before shipping to untrusted/pu
 6. **AMI lifecycle/retention** — old golden AMIs accumulate under `self`; add cleanup automation.
 7. **Source scans** — Trivy / Amazon Inspector on output AMIs (roadmap).
 
-Sensible-tomorrow items: `docker compose up -d --build`, add a reverse proxy, wire
+Near-term improvements: `docker compose up -d --build`, add a reverse proxy, wire
 Flask-Limiter, add a nightly SQLite backup cron, then re-run the fresh-build matrix.
 
 ### Reset / Fresh Start
@@ -364,7 +365,7 @@ web/
     └── requirements.txt    # flask, cryptography, boto3, requests, gunicorn
 scripts/
     ├── setup-aws.sh        # IAM/OIDC setup
-    ├── setup-ec2.sh        # one-shot EC2 demo deploy (clone→certs→.env→compose)
+    ├── setup-ec2.sh        # one-shot EC2 deploy (clone→certs→.env→compose)
     ├── run-docker-aws.sh   # pull-and-run prebuilt GHCR image (no build/clone)
     ├── packer-build.sh     # local build helper
     ├── gen-cert.sh         # self-signed TLS cert generator
