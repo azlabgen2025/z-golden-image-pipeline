@@ -24,8 +24,8 @@ Web UI (Flask) --> GitHub Actions --> Packer --> EC2 (t2.micro / t3.small) --> A
 
 - AWS account (any tier — builds run on `t2.micro`, mostly within the Free Tier)
 - GitHub account (a fresh repo is fine — everything is in this repository)
-- **`git` and the AWS CLI v2** installed on any machine you run the one-time
-  setup from (your laptop or a fresh Ubuntu VM — see below)
+- **`git` and the AWS CLI v2** on the machine used for the one-time IAM setup
+  (skip this if you're a restricted/non-admin user following [Step 1c](#1c-restricted--non-admin-aws-user-no-iam-rights) — the app only needs your existing access keys)
 
 **Install `git` + AWS CLI v2 on a fresh Ubuntu VM** (skip if already present):
 
@@ -106,6 +106,11 @@ aws configure    # enter an IAM user access key + secret + region
 
 ### 1. AWS Setup
 
+> **Restricted / non-admin AWS user? Jump to [1c](#1c-restricted--non-admin-aws-user-no-iam-rights).**
+> The app itself only needs *read-only* keys — but the one-time role creation below
+> needs AWS **admin** rights. If you can't do IAM, have your AWS admin run it once
+> (it's a single script) and hand you the ARN.
+
 **1a. Create an IAM user + access key (needed for `aws configure`):**
 
 - AWS Console → **IAM** → **Users** → **Create user** (name e.g. `golden-admin`)
@@ -138,6 +143,29 @@ This creates:
 - IAM role `GitHubActionsPackerRole` with an OIDC trust to your GitHub repo
 - IAM policy `GoldenImagePackerPolicy` (EC2/S3/PassRole access for builds)
 - Prints the role ARN to paste as a GitHub secret
+
+**1c. Restricted / non-admin AWS user (no IAM rights):**
+
+If you only have **account access + security keys** (a limited user, e.g. from
+your company) and cannot create IAM roles, the `setup-aws.sh` step above can't
+run under your account — it needs admin rights. Do this instead:
+
+1. **Ask your AWS admin to run `setup-aws.sh` once** for you (they paste your
+   fork's `org/repo` when prompted). It's a single command and creates only
+   what builds need. They give you back the printed
+   `AWS_ROLE_TO_ASSUME = arn:aws:iam::123456789012:role/GitHubActionsPackerRole`.
+   > The admin can run it from their own machine with their own admin keys —
+   > *no need to share your keys with them or theirs with you*.
+2. **Your own security keys are only used by the web app for read-only
+   listing** (verify login, list golden images). The *builds* run in GitHub
+   Actions as the role above — your keys are never used to build, so they do
+   **not** need EC2/other permissions.
+3. Skip the rest of `1a/1b` tool-install steps (`aws configure`, etc.) — you
+   don't need the AWS CLI at all for the web-app path.
+
+> **Security note for the admin:** the OIDC trust is scoped to exactly one
+> GitHub repo (`repo:<org>/<fork>:*`), and the role can only build AMIs — it
+> can't touch anything in your AWS account outside this repo's workflow runs.
 
 ### 2. GitHub Secrets
 
@@ -185,10 +213,10 @@ Once the app is running you paste these into **Settings/Connect AWS** and
 
 | Where in the app | What to paste | Where you created it |
 |------------------|---------------|----------------------|
-| **Connect AWS** → access key ID | `AKIA...` | Step 1a → user's **Security credentials** → **Create access key** |
+| **Connect AWS** → access key ID | `AKIA...` | Admin user: Step 1a → **Security credentials** → **Create access key**. Restricted user: **your existing security keys** (they're all you need — read-only use) |
 | **Connect AWS** → secret access key | `...` | same as above (shown once) |
 | **Connect AWS** → region | `us-east-1` | same as above |
-| **Connect GitHub** → token | `github_pat_...` | Step 0 → **Fine-grained token** (Actions read/write) |
+| **Connect GitHub** → token | `github_pat_...` | Step 0 → **Fine-grained token** (Actions read/write + Metadata read-only) |
 | **Connect GitHub** → repo | `<YOU>/golden-image-pipeline` | your fork |
 
 Keep these in your password manager — the app shows them only once when you save.
