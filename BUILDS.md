@@ -29,3 +29,4 @@ docker run -d --name golden-image-pipeline --restart unless-stopped \
 # 3. Check the running version (should match the row you picked):
 curl -s http://<your-ip>:8080/api/version
 ```
+| 21 | 0.1.0 | `557889e` | 2026-09-23 | `v0.1.0-build-21`, `v0.1.0-557889e` | sha256:a319669b8f5981ab747e92e70251026360875928248ac1d00f638acba1ba9faa | ci: give Build step id 'build-push' so the Record build step fires (it was skipped every run) |
