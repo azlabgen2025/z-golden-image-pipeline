@@ -9,9 +9,13 @@ safe to roll back: every build points to exactly one commit.
 |-------|---------|--------|------|------------|------------------|---------|
 | 1 | 0.1.0 | `fd680b8` | 2026-09-21 | `v0.1.0-build-1`, `v0.1.0-fd680b8` | `9684a30f9a7447b20990fa264305abf65e4c658225c679d884560b3ff272db2c` | build: version images properly — per-build tags, generate version.json at build time |
 | 17 | 0.1.0 | `1eb7b42` | 2026-09-21 | `v0.1.0-build-17`, `v0.1.0-1eb7b42` | `abc8f2cdcec44024583f2f9f347584507a791a4a8c8b7aec655cf9b4b61cb528` | ci: fetch full history so the per-build image tag uses the real build count |
+| 18 | 0.1.0 | `d266757` | 2026-09-23 | `v0.1.0-build-18`, `v0.1.0-d266757` | `ae922de589668e0834eaaff257d56331d12c9b48787204344e5a5cfcfa650fc7` | docs: add BUILDS.md build log; workflow now records every build (build#, commit, summary, tags, digest) |
+| 19 | 0.1.0 | `7b8b88e` | 2026-09-23 | `v0.1.0-build-19`, `v0.1.0-7b8b88e` | `fffd52ebe92a1989206a10d7bd7986be4a63f87324c2825cb02fc499bb8dca48` | fix: fail loudly if stored AWS keys are empty/unreadable — no silent ambient-credential fallback; plain-language hint tells user to re-save the account |
+| 21 | 0.1.0 | `557889e` | 2026-09-23 | `v0.1.0-build-21`, `v0.1.0-557889e` | `a319669b8f5981ab747e92e70251026360875928248ac1d00f638acba1ba9faa` | ci: give Build step id 'build-push' so the Record build step fires (it was skipped every run) |
 
 > Note: build 1's counter was under-estimated (shallow clone); the count was
 > corrected to the real value (17) once the workflow fetched full history.
+> Build 20 produced no image (README/docs-only commit, not rebuilt).
 
 ## How to roll back
 
@@ -29,4 +33,3 @@ docker run -d --name golden-image-pipeline --restart unless-stopped \
 # 3. Check the running version (should match the row you picked):
 curl -s http://<your-ip>:8080/api/version
 ```
-| 21 | 0.1.0 | `557889e` | 2026-09-23 | `v0.1.0-build-21`, `v0.1.0-557889e` | sha256:a319669b8f5981ab747e92e70251026360875928248ac1d00f638acba1ba9faa | ci: give Build step id 'build-push' so the Record build step fires (it was skipped every run) |

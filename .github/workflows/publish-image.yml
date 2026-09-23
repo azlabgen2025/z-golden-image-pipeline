@@ -88,9 +88,19 @@ jobs:
           DATE="$(date +%Y-%m-%d)"
           SUMMARY="$(git log -1 --pretty=%s)"
           VERSION_LINE="$(cat VERSION)"
-          # Append a row unless this build number is already logged
+          # Insert a row after the last table row (or append), unless this
+          # build number is already logged. Inserting keeps the row inside the
+          # table, above the footer/rollback sections.
+          ROW="| ${BUILD} | ${VERSION_LINE} | \`${SHA}\` | ${DATE} | \`v${VERSION_LINE}-build-${BUILD}\`, \`v${VERSION_LINE}-${SHA}\` | ${{ steps.build-push.outputs.digest }} | ${SUMMARY} |"
           if ! grep -q "^| ${BUILD} |" BUILDS.md; then
-            echo "| ${BUILD} | ${VERSION_LINE} | \`${SHA}\` | ${DATE} | \`v${VERSION_LINE}-build-${BUILD}\`, \`v${VERSION_LINE}-${SHA}\` | ${{ steps.build-push.outputs.digest }} | ${SUMMARY} |" >> BUILDS.md
+            if rg -q '^\| [0-9]+ \|' BUILDS.md; then
+              LASTLINE="$(rg '^\| [0-9]+ \|' BUILDS.md | tail -1)"
+              # insert right after LASTLINE (escaped for sed)
+              ESC="$(printf '%s' "$LASTLINE" | sed 's/[\/&]/\\&/g')"
+              sed -i.bak "s|^${ESC}\$|&\n${ROW}|" BUILDS.md && rm -f BUILDS.md.bak
+            else
+              echo "$ROW" >> BUILDS.md
+            fi
             git config user.name "golden-pipeline[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add BUILDS.md
