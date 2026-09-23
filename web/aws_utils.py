@@ -1,4 +1,5 @@
 import boto3
+from botocore.exceptions import NoCredentialsError
 
 
 def session_for_account(account):
@@ -13,6 +14,11 @@ def session_for_account(account):
     access_key = decrypt_secret(account["access_key_enc"])
     secret_key = decrypt_secret(account["secret_key_enc"])
     region = account["region"] or "us-east-1"
+    if not access_key or not secret_key:
+        raise NoCredentialsError(
+            msg=("Stored AWS credentials could not be read (the stored keys are empty). "
+                 "Delete this account and re-save it with a fresh Access Key + Secret.")
+        )
     return boto3.Session(
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
