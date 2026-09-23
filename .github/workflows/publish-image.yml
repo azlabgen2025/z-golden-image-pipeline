@@ -59,6 +59,7 @@ jobs:
           cat web/version.json
 
       - name: Build and push
+        id: build-push
         uses: docker/build-push-action@v5
         with:
           context: .
