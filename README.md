@@ -407,6 +407,40 @@ restart policy, and optional TLS. Remaining gaps before shipping to untrusted/pu
 Near-term improvements: `docker compose up -d --build`, add a reverse proxy, wire
 Flask-Limiter, add a nightly SQLite backup cron, then re-run the fresh-build matrix.
 
+### Troubleshooting
+
+**"Credentials invalid" in the web app, but the AWS account row says Active — or
+"Stored AWS credentials could not be read".**
+
+The app stores your Access Key + Secret Fernet-encrypted in its data volume.
+If the volume/encryption key changed (container recreated without the volume), the
+stored keys become unreadable. Fix: **Settings → Connect AWS → delete the account and
+re-save it with a fresh Access Key + Secret** (`AKIA…`, created under IAM → your user →
+Security credentials). Prefer running the app via Method 1 so the `golden-image-data`
+volume is always reused.
+
+**A build shows "retry … credentials could not be loaded" in GitHub Actions
+(`Configure AWS Credentials` step).**
+
+That error comes from `aws-actions/configure-aws-credentials@v6` and is about the
+**OIDC role**, not the web app keys. Builds run in GitHub Actions and assume the role
+stored in the `AWS_ROLE_TO_ASSUME` secret — they never use the keys pasted into the
+web UI. Check, in order:
+
+1. Your fork has the `AWS_ROLE_TO_ASSUME` secret = the exact role ARN printed by
+   `setup-aws.sh` (same AWS account that owns the golden AMIs).
+2. Actions is enabled on the fork (GitHub → fork → Actions tab → Enable).
+3. `setup-aws.sh` was run once by an AWS admin so the OIDC provider + role exist for
+   *your* repo.
+4. The `AWS_ROLE_TO_ASSUME` role and the Web UI Connect-AWS account point to the
+   **same** AWS account.
+
+**How to version / pin the container to a known build.** Every image push records a row
+in [BUILDS.md](./BUILDS.md) (build #, commit, date, tags, digest, change summary). To run
+a specific earlier build: `docker pull ghcr.io/<owner>/golden-image-pipeline:v0.1.0-build-<N>`
+and run that tag. Build numbers only increase when the code changes — re-running the same
+commit keeps the same build number, so you can always roll back.
+
 ### Reset / Fresh Start
 
 To wipe all data (users, AWS accounts, GitHub connections, jobs) and start over with a clean default admin:
