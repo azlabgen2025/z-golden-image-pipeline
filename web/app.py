@@ -244,6 +244,11 @@ def _aws_status(user):
 def _aws_error_hint(error_text):
     """Map a raw boto3/STS error to a plain-language fix."""
     e = (error_text or "").lower()
+    if "missing credential" in e or "unable to locate" in e or "could not be loaded" in e or "no credentials" in e:
+        return ("The app can't read its stored AWS keys (they are empty or unreadable). "
+                "Delete this account and re-save it with a fresh Access Key + Secret key. "
+                "This happens when the app's encryption key changes (e.g. the data volume "
+                "was recreated).")
     if "invalidclienttokenid" in e or "signaturedoesnotmatch" in e:
         return ("Credentials are wrong or were deleted. Re-create the access key "
                 "in AWS (IAM → user → Security credentials → Create access key) "
