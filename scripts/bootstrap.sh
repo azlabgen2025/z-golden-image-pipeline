@@ -34,7 +34,7 @@ while [ $# -gt 0 ]; do
         --dry-run)      DRY_RUN=true ;;
         --skip-secrets) SKIP_SECRETS=true ;;
         --force-keys)   FORCE_KEYS=true ;;
-        -h|--help)      sed -n '4,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help)      sed -n '4,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         --)             shift; POSITIONAL+=("$@"); break ;;
         -*)             echo "ERROR: unknown option: $1" >&2
                          echo "Try: $0 --help" >&2; exit 2 ;;

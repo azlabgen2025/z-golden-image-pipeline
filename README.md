@@ -60,6 +60,10 @@ aws configure    # enter an IAM user access key + secret + region
 
 ## Quick Start (common setup for all run methods)
 
+> **New to this? Start here:** **[docs/SETUP-FROM-SCRATCH.md](docs/SETUP-FROM-SCRATCH.md)**
+> is a complete step-by-step guide for a non-expert, from launching the EC2
+> server to the first finished build. Every step is one copy-pasteable block.
+
 > These steps are the **same for every way of running the app** — they must be done
 > once before using the web UI (see [Ways to run the app](#ways-to-run-the-app)).
 

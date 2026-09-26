@@ -221,9 +221,6 @@ if cd "$REPO_ROOT" && git ls-files --error-unmatch ansible/base/vars/golden_user
 else
   ok "no committed public key in the repo"
 fi
-if VCPU=$(aws ec2 describe-instance-types --query 'InstanceTypes[].VCpuInfo.DefaultVCpus' --output text 2>/dev/null); then
-  :
-fi
 LIMITS=$(aws service-quotas get-service-quota --service-code ec2 --quota-code L-1216C47A \
   --query 'Quota.Value' --output text 2>/dev/null)
 if [ -n "$LIMITS" ] && [ "$LIMITS" != "None" ]; then
