@@ -12,6 +12,8 @@ safe to roll back: every build points to exactly one commit.
 | 18 | 0.1.0 | `d266757` | 2026-09-23 | `v0.1.0-build-18`, `v0.1.0-d266757` | `ae922de589668e0834eaaff257d56331d12c9b48787204344e5a5cfcfa650fc7` | docs: add BUILDS.md build log; workflow now records every build (build#, commit, summary, tags, digest) |
 | 19 | 0.1.0 | `7b8b88e` | 2026-09-23 | `v0.1.0-build-19`, `v0.1.0-7b8b88e` | `fffd52ebe92a1989206a10d7bd7986be4a63f87324c2825cb02fc499bb8dca48` | fix: fail loudly if stored AWS keys are empty/unreadable — no silent ambient-credential fallback; plain-language hint tells user to re-save the account |
 | 21 | 0.1.0 | `557889e` | 2026-09-23 | `v0.1.0-build-21`, `v0.1.0-557889e` | `a319669b8f5981ab747e92e70251026360875928248ac1d00f638acba1ba9faa` | ci: give Build step id 'build-push' so the Record build step fires (it was skipped every run) |
+| 25 | 0.1.0 | `ae5b15b` | 2026-09-26 | `v0.1.0-build-25`, `v0.1.0-ae5b15b` | sha256:65b648948b0544279bdf9e0e4c43c9d8b063b29f78d9bc615024ab1bc2c621af | Fix argument parsing and key generation in the setup scripts |
+| 27 | 0.1.0 | `7974130` | 2026-09-26 | `v0.1.0-build-27`, `v0.1.0-7974130` | sha256:b8bba737e27731dbbeecd0960a6e37e5c62c72282c79dd689ab3833cb4a22638 | Add a complete non-expert setup guide |
 
 > Note: build 1's counter was under-estimated (shallow clone); the count was
 > corrected to the real value (17) once the workflow fetched full history.
@@ -32,5 +34,4 @@ docker run -d --name golden-image-pipeline --restart unless-stopped \
 
 # 3. Check the running version (should match the row you picked):
 curl -s http://<your-ip>:8080/api/version
-```| 25 | 0.1.0 | `ae5b15b` | 2026-09-26 | `v0.1.0-build-25`, `v0.1.0-ae5b15b` | sha256:65b648948b0544279bdf9e0e4c43c9d8b063b29f78d9bc615024ab1bc2c621af | Fix argument parsing and key generation in the setup scripts |
-| 27 | 0.1.0 | `7974130` | 2026-09-26 | `v0.1.0-build-27`, `v0.1.0-7974130` | sha256:b8bba737e27731dbbeecd0960a6e37e5c62c72282c79dd689ab3833cb4a22638 | Add a complete non-expert setup guide |
+```

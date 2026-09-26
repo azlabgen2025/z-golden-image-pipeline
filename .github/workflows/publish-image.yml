@@ -3,12 +3,20 @@ name: publish-image
 on:
   push:
     branches: [ main ]
+    # Only paths that actually change the published image. The Dockerfile copies
+    # web/, config/, the version files and scripts/docker-entrypoint.sh, so a
+    # change to any other script — or to documentation — does not need a rebuild.
+    # Watching scripts/ wholesale rebuilt and republished the image for edits
+    # that were not in the image at all.
     paths:
       - 'web/**'
       - 'config/**'
       - 'Dockerfile'
       - 'docker-compose.yml'
-      - 'scripts/**'
+      - 'scripts/docker-entrypoint.sh'
+      - 'VERSION'
+      - 'NOTICE'
+      - 'LICENSE'
       - 'requirements*.txt'
   workflow_dispatch:
 
@@ -88,24 +96,33 @@ jobs:
           DATE="$(date +%Y-%m-%d)"
           SUMMARY="$(git log -1 --pretty=%s)"
           VERSION_LINE="$(cat VERSION)"
-          # Insert a row after the last table row (or append), unless this
-          # build number is already logged. Inserting keeps the row inside the
-          # table, above the footer/rollback sections.
           ROW="| ${BUILD} | ${VERSION_LINE} | \`${SHA}\` | ${DATE} | \`v${VERSION_LINE}-build-${BUILD}\`, \`v${VERSION_LINE}-${SHA}\` | ${{ steps.build-push.outputs.digest }} | ${SUMMARY} |"
-          if ! grep -q "^| ${BUILD} |" BUILDS.md; then
-            if rg -q '^\| [0-9]+ \|' BUILDS.md; then
-              LASTLINE="$(rg '^\| [0-9]+ \|' BUILDS.md | tail -1)"
-              # insert right after LASTLINE (escaped for sed)
-              ESC="$(printf '%s' "$LASTLINE" | sed 's/[\/&]/\\&/g')"
-              sed -i.bak "s|^${ESC}\$|&\n${ROW}|" BUILDS.md && rm -f BUILDS.md.bak
-            else
-              echo "$ROW" >> BUILDS.md
-            fi
-            git config user.name "golden-pipeline[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add BUILDS.md
-            git -c commit.gpgsign=false commit -m "docs: log build #${BUILD} (${SHA})" --no-verify
-            git push origin HEAD:${GITHUB_REF_NAME}
-          else
+          if grep -q "^| ${BUILD} |" BUILDS.md; then
             echo "Build #${BUILD} already logged; skipping."
+            exit 0
           fi
+          # Insert the row at the end of the table, immediately after the last
+          # existing "|<number>|" row and before any following prose.
+          #
+          # This deliberately avoids sed: the rows contain '|' characters, so
+          # using '|' as the s/// delimiter corrupts the expression, and a
+          # previous version appended the row to the end of the file instead
+          # (once even gluing it onto a closing code fence, because the file
+          # had no trailing newline). awk has no delimiter problem, does not
+          # depend on ripgrep being installed, and its END block guarantees the
+          # row is never dropped.
+          awk -v row="$ROW" '
+            BEGIN { seen = 0; inserted = 0 }
+            /^\|[[:space:]]*[0-9]+[[:space:]]*\|/ { seen = 1; print; next }
+            {
+              if (seen && !inserted) { print row; inserted = 1 }
+              print
+            }
+            END { if (!inserted) print row }
+          ' BUILDS.md > BUILDS.md.new
+          mv BUILDS.md.new BUILDS.md
+          git config user.name "golden-pipeline[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add BUILDS.md
+          git -c commit.gpgsign=false commit -m "docs: log build #${BUILD} (${SHA})" --no-verify
+          git push origin HEAD:${GITHUB_REF_NAME}
