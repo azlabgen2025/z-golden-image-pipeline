@@ -33,3 +33,4 @@ docker run -d --name golden-image-pipeline --restart unless-stopped \
 # 3. Check the running version (should match the row you picked):
 curl -s http://<your-ip>:8080/api/version
 ```| 25 | 0.1.0 | `ae5b15b` | 2026-09-26 | `v0.1.0-build-25`, `v0.1.0-ae5b15b` | sha256:65b648948b0544279bdf9e0e4c43c9d8b063b29f78d9bc615024ab1bc2c621af | Fix argument parsing and key generation in the setup scripts |
+| 27 | 0.1.0 | `7974130` | 2026-09-26 | `v0.1.0-build-27`, `v0.1.0-7974130` | sha256:b8bba737e27731dbbeecd0960a6e37e5c62c72282c79dd689ab3833cb4a22638 | Add a complete non-expert setup guide |
