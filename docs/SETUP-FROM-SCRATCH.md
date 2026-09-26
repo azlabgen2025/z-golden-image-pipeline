@@ -74,12 +74,23 @@ You should see a version number for both `git` and `aws`.
 > unzip -o awscliv2.zip && sudo ./aws/install
 > ```
 
-Now install the GitHub helper tool:
+Now install the GitHub helper tool (`gh`) from GitHub's official apt repo:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/cli/cli/trunk/scripts/gh-installer.sh | bash
+sudo apt-get install -y wget
+sudo mkdir -p -m 755 /etc/apt/keyrings
+wget -nv -O /tmp/gh-archive-keyring.gpg https://cli.github.com/packages/githubcli-archive-keyring.gpg
+sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg < /tmp/gh-archive-keyring.gpg > /dev/null
+sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+sudo mkdir -p -m 755 /etc/apt/sources.list.d
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+sudo apt-get update
+sudo apt-get install -y gh
 gh --version
 ```
+
+You should see a version number. Do not install `gh` as a snap — GitHub
+discontinued that method.
 
 ---
 
@@ -161,6 +172,10 @@ export MY_IP="YOUR.SERVER.IP.ADDRESS"
 ```
 
 From here on, every command below is copy-pasteable as-is.
+
+> **If you get disconnected and log back in, re-run this step.** These four
+> values are only remembered for the current terminal session, and the later
+> steps use them. If a later step complains about an empty value, this is why.
 
 ---
 
