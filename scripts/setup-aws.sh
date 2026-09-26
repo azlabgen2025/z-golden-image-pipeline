@@ -210,12 +210,26 @@ EOF
 
 POLICY_ARN="arn:aws:iam::${ACCOUNT}:policy/${POLICY_NAME}"
 if aws iam get-policy --policy-arn "$POLICY_ARN" >/dev/null 2>&1; then
-  echo "==> Policy ${POLICY_NAME} exists; creating a new version with current permissions."
-  VERSION="$(aws iam get-policy --policy-arn "$POLICY_ARN" --query 'Policy.DefaultVersionId' --output text)"
-  NEXT=$(( VERSION + 1 ))
-  aws iam create-policy-version --policy-arn "$POLICY_ARN" \
-    --policy-document "$POLICY_DOC" --set-as-default >/dev/null
-  echo "    Policy ${POLICY_NAME} now at default version v${NEXT}."
+  # Only publish a new version when the document actually differs. Bumping
+  # unconditionally churned a version on every re-run, and AWS keeps just five
+  # by default, so a few repeated runs would start failing.
+  CURRENT_VERSION="$(aws iam get-policy --policy-arn "$POLICY_ARN" --query 'Policy.DefaultVersionId' --output text)"
+  # DefaultVersionId comes back as "v4"; strip the "v" before doing arithmetic
+  # or bash treats it as a variable name and dies under `set -u`.
+  CURRENT_NUM="${CURRENT_VERSION#v}"
+  CURRENT_DOC="$(aws iam get-policy-version --policy-arn "$POLICY_ARN" \
+    --version-id "$CURRENT_VERSION" --query 'PolicyVersion.Document' --output json 2>/dev/null || echo '{}')"
+  NORM_CUR="$(printf '%s' "$CURRENT_DOC"  | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin).get("Statement"), sort_keys=True))' 2>/dev/null || echo 'unparsable')"
+  NORM_NEW="$(printf '%s' "$POLICY_DOC"     | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin).get("Statement"), sort_keys=True))' 2>/dev/null || echo 'unparsable')"
+  if [ "$NORM_CUR" = "$NORM_NEW" ] && [ "$NORM_NEW" != "unparsable" ]; then
+    echo "==> Policy ${POLICY_NAME} already up to date (${CURRENT_VERSION}); not creating a new version."
+  else
+    NEXT=$(( CURRENT_NUM + 1 ))
+    echo "==> Policy ${POLICY_NAME} exists; permissions changed, creating version v${NEXT}."
+    aws iam create-policy-version --policy-arn "$POLICY_ARN" \
+      --policy-document "$POLICY_DOC" --set-as-default >/dev/null
+    echo "    Policy ${POLICY_NAME} now at default version v${NEXT}."
+  fi
 else
   echo "==> Creating policy ${POLICY_NAME}..."
   aws iam create-policy --policy-name "$POLICY_NAME" \
