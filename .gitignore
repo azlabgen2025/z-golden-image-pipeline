@@ -21,6 +21,11 @@ certs/
 web/secret.key
 web/*.db
 
+# Per-installer SSH public key written by scripts/setup-keys.sh.
+# Never commit a real key: the public half is matched by a private half that
+# grants passwordless ec2-user SSH on every image you build.
+ansible/base/vars/golden_user.pub
+
 # Runtime data volume (DB + encryption key)
 data/
 

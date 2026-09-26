@@ -48,7 +48,7 @@ build {
   provisioner "ansible" {
     playbook_file = "../../ansible/base/debian.yml"
     extra_arguments = [
-      "--extra-vars", "customer=${var.customer} extra_packages=${join(",", var.extra_packages)} image_type=${var.department}"
+      "--extra-vars", "customer=${var.customer} extra_packages=${join(",", var.extra_packages)} image_type=${var.department} golden_user_pub=${jsonencode(var.golden_user_pub)}"
     ]
   }
 

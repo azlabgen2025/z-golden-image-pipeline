@@ -14,7 +14,12 @@ services:
       - FLASK_DEBUG=false
       - PORT=8080
       - ADMIN_USER=${ADMIN_USER:-admin}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      # No default password: the entrypoint generates a random one on first
+      # boot and prints it once. To pin your own, create .env with
+      #   ADMIN_USER=admin
+      #   ADMIN_PASSWORD=choose-something-long
+      # before the first start.
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       # Version marker for /api/version (optional).
       # - BUILD_ID=42
       # - BUILD_COMMIT=abc1234

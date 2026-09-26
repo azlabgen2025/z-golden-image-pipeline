@@ -103,11 +103,54 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Preflight configuration check
+        run: |
+          ROLE="${{ inputs.aws_role_to_assume || secrets.AWS_ROLE_TO_ASSUME }}"
+          if [ -z "$ROLE" ]; then
+            echo "::error::No AWS role configured, so the build cannot continue."
+            echo ""
+            echo "Neither the AWS_ROLE_TO_ASSUME secret nor the 'aws_role_to_assume'"
+            echo "dispatch input supplied a role ARN."
+            echo ""
+            echo "Fix it once, in your clone of this repo:"
+            echo "    ./scripts/bootstrap.sh"
+            echo ""
+            echo "That generates your SSH keypair, creates the OIDC provider and the"
+            echo "GitHubActionsPackerRole in YOUR AWS account, and stores the role ARN"
+            echo "as a secret on this repository."
+            echo ""
+            echo "Running from a FORK? GitHub does not copy secrets into forks. Add"
+            echo "the secret to your own fork under Settings -> Secrets and variables"
+            echo "-> Actions, or paste the role ARN into the 'IAM role ARN for the"
+            echo "runner to assume' field on this dispatch form."
+            exit 1
+          fi
+          echo "AWS role: $ROLE"
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ inputs.aws_role_to_assume || secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Derive golden SSH public key from the private-key secret
+        run: |
+          GOLDEN_KEY="${RUNNER_TEMP}/golden_ssh.pem"
+          echo "${{ secrets.GOLDEN_SSH_PRIVATE_KEY }}" > "$GOLDEN_KEY"
+          chmod 600 "$GOLDEN_KEY"
+          if [ ! -s "$GOLDEN_KEY" ]; then
+            echo "GOLDEN_SSH_PRIVATE_KEY is not set."
+            echo "No project SSH key will be baked into the image. It is still"
+            echo "usable via your EC2 launch keypair (cloud-init injects it into"
+            echo "ec2-user), but customized/layer-2 builds will fail. Run"
+            echo "./scripts/bootstrap.sh to generate a keypair."
+            echo "GOLDEN_PUB=" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          GOLDEN_PUB="$(ssh-keygen -y -f "$GOLDEN_KEY" | awk '{print $1" "$2}') golden-image-pipeline"
+          echo "Baking golden SSH key: $GOLDEN_PUB" | cut -c1-80
+          echo "GOLDEN_PUB=$GOLDEN_PUB" >> "$GITHUB_ENV"
+          echo "HAS_GOLDEN_KEY=true" >> "$GITHUB_ENV"
 
       - name: Setup Packer
         uses: hashicorp/setup-packer@v3
@@ -167,6 +210,9 @@ jobs:
           AMI_TAGS: ${{ inputs.ami_tags || '' }}
         run: |
           ARGS=(-var "customer=$CUSTOMER" -var "department=base")
+          if [ -n "${GOLDEN_PUB:-}" ]; then
+            ARGS+=(-var "golden_user_pub=$GOLDEN_PUB")
+          fi
           if [ -n "$BASE_PKGS" ]; then
             EXTRA=$(echo "$BASE_PKGS" | sed 's/[^,]*/"&"/g' | sed '1s/^/[/; $s/$/]/')
             ARGS+=(-var "extra_packages=$EXTRA")
@@ -233,11 +279,54 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
+      - name: Preflight configuration check
+        run: |
+          ROLE="${{ inputs.aws_role_to_assume || secrets.AWS_ROLE_TO_ASSUME }}"
+          if [ -z "$ROLE" ]; then
+            echo "::error::No AWS role configured, so the build cannot continue."
+            echo ""
+            echo "Neither the AWS_ROLE_TO_ASSUME secret nor the 'aws_role_to_assume'"
+            echo "dispatch input supplied a role ARN."
+            echo ""
+            echo "Fix it once, in your clone of this repo:"
+            echo "    ./scripts/bootstrap.sh"
+            echo ""
+            echo "That generates your SSH keypair, creates the OIDC provider and the"
+            echo "GitHubActionsPackerRole in YOUR AWS account, and stores the role ARN"
+            echo "as a secret on this repository."
+            echo ""
+            echo "Running from a FORK? GitHub does not copy secrets into forks. Add"
+            echo "the secret to your own fork under Settings -> Secrets and variables"
+            echo "-> Actions, or paste the role ARN into the 'IAM role ARN for the"
+            echo "runner to assume' field on this dispatch form."
+            exit 1
+          fi
+          echo "AWS role: $ROLE"
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ inputs.aws_role_to_assume || secrets.AWS_ROLE_TO_ASSUME }}
           aws-region: ${{ env.AWS_REGION }}
+
+      - name: Derive golden SSH public key from the private-key secret
+        run: |
+          GOLDEN_KEY="${RUNNER_TEMP}/golden_ssh.pem"
+          echo "${{ secrets.GOLDEN_SSH_PRIVATE_KEY }}" > "$GOLDEN_KEY"
+          chmod 600 "$GOLDEN_KEY"
+          if [ ! -s "$GOLDEN_KEY" ]; then
+            echo "GOLDEN_SSH_PRIVATE_KEY is not set."
+            echo "No project SSH key will be baked into the image. It is still"
+            echo "usable via your EC2 launch keypair (cloud-init injects it into"
+            echo "ec2-user), but customized/layer-2 builds will fail. Run"
+            echo "./scripts/bootstrap.sh to generate a keypair."
+            echo "GOLDEN_PUB=" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          GOLDEN_PUB="$(ssh-keygen -y -f "$GOLDEN_KEY" | awk '{print $1" "$2}') golden-image-pipeline"
+          echo "Baking golden SSH key: $GOLDEN_PUB" | cut -c1-80
+          echo "GOLDEN_PUB=$GOLDEN_PUB" >> "$GITHUB_ENV"
+          echo "HAS_GOLDEN_KEY=true" >> "$GITHUB_ENV"
 
       - name: Setup Packer
         uses: hashicorp/setup-packer@v3
@@ -257,12 +346,19 @@ jobs:
           echo "KEY_NAME=$KEY_NAME" >> "$GITHUB_ENV"
           echo "KEY_FILE=$KEY_FILE" >> "$GITHUB_ENV"
 
-      - name: Write golden standard SSH private key for custom builds
+      - name: Require the golden SSH key for customized builds
         run: |
-          GOLDEN_KEY="${RUNNER_TEMP}/golden_ssh.pem"
-          echo "${{ secrets.GOLDEN_SSH_PRIVATE_KEY }}" > "$GOLDEN_KEY"
-          chmod 600 "$GOLDEN_KEY"
-          echo "GOLDEN_KEY=$GOLDEN_KEY" >> "$GITHUB_ENV"
+          if [ "${HAS_GOLDEN_KEY:-false}" != "true" ]; then
+            echo "::error::GOLDEN_SSH_PRIVATE_KEY is required for customized (layer 2) builds."
+            echo ""
+            echo "A customized build SSHes into the base AMI as ec2-user, so it needs"
+            echo "the private key matching the public key baked into that image."
+            echo ""
+            echo "Run this once in your clone, then re-dispatch:"
+            echo "    ./scripts/bootstrap.sh"
+            exit 1
+          fi
+          echo "Golden SSH key present; proceeding."
 
       - name: Init Packer Plugins
         run: packer init .
@@ -305,7 +401,10 @@ jobs:
           fi
           EXTRA=$(echo "$CUSTOM_PKGS" | sed 's/[^,]*/"&"/g' | sed '1s/^/[/; $s/$/]/')
           ARGS=(-var "customer=$CUSTOMER" -var "source_ami=$SOURCE_AMI" -var "extra_packages=$EXTRA" -var "department=customized")
-          ARGS+=(-var "ssh_username=ec2-user" -var "ssh_private_key_file=$GOLDEN_KEY")
+          ARGS+=(-var "ssh_username=ec2-user" -var "ssh_private_key_file=${RUNNER_TEMP}/golden_ssh.pem")
+          if [ -n "${GOLDEN_PUB:-}" ]; then
+            ARGS+=(-var "golden_user_pub=$GOLDEN_PUB")
+          fi
           ARGS+=(-var "ami_name=$AMI_NAME")
           if [ -n "$AMI_TAGS" ]; then
             TAGS=$(echo "$AMI_TAGS" | tr ',;' '\n' | grep -E '^[^=]+=[^=]+$' | sed 's/^\([^=]*\)=\(.*\)$/"\1"="\2"/' | paste -sd, -)

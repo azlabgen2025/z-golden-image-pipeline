@@ -43,6 +43,11 @@ variable "ssh_private_key_file" {
   default = ""
 }
 
+variable "golden_user_pub" {
+  type    = string
+  default = ""
+}
+
 variable "extra_tags" {
   type    = map(string)
   default = {}

@@ -38,6 +38,11 @@ variable "ssh_username" {
   default = "ec2-user"
 }
 
+variable "golden_user_pub" {
+  type    = string
+  default = ""
+}
+
 variable "extra_tags" {
   type    = map(string)
   default = {}

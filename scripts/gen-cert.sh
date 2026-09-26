@@ -2,7 +2,7 @@
 # Copyright (c) 2026 Deepesh Rajpal. Licensed under the Mozilla Public License 2.0 (MPL-2.0).
 # Generate a self-signed TLS certificate for the web app.
 # Usage: ./scripts/gen-cert.sh [output-dir] [domain...]
-# Example: ./scripts/gen-cert.sh certs localhost 127.0.0.1 192.168.1.216
+# Example: ./scripts/gen-cert.sh certs localhost 127.0.0.1 192.168.1.50
 # Then run: TLS_CERT=certs/tls.crt TLS_KEY=certs/tls.key python3 web/app.py
 set -euo pipefail
 

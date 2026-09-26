@@ -20,6 +20,16 @@ run_local() {
     export SECRET_KEY_FILE="${SECRET_KEY_FILE:-$ROOT/web/secret.key}"
     export FLASK_DEBUG="${FLASK_DEBUG:-false}"
     export PORT="${PORT:-8080}"
+    if [ -z "${FLASK_SECRET:-}" ]; then
+        echo "FLASK_SECRET not set -> an ephemeral session key is generated, so"
+        echo "you will be logged out on restart. Set FLASK_SECRET in .env to keep"
+        echo "sessions across restarts."
+    fi
+    if [ -z "${ADMIN_PASSWORD:-}" ] && [ ! -f "$DATABASE_PATH" ]; then
+        echo "No ADMIN_PASSWORD set and no existing database -> the default"
+        echo "admin/admin credentials will be created. Set ADMIN_PASSWORD in .env"
+        echo "to choose your own before the first run."
+    fi
 
     "$SCRIPT_DIR/build-version.sh"
 

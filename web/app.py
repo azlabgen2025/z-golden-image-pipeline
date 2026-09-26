@@ -5,6 +5,7 @@
 import os
 import re
 import json
+import sys
 from functools import wraps
 
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
@@ -17,7 +18,21 @@ from crypto import encrypt_secret, decrypt_secret
 _RUN_NAME_RE = re.compile(r"\(([^)]+)\)\s*\.?$")
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET", "dev-secret-change-me")
+# Never fall back to a hard-coded value: a published default session key lets
+# anyone who has read the source forge a session cookie. The container
+# entrypoint sets FLASK_SECRET; for local runs we generate an ephemeral one.
+_secret = os.environ.get("FLASK_SECRET", "").strip()
+if not _secret:
+    import secrets as _secrets
+
+    _secret = _secrets.token_hex(32)
+    print(
+        "[app] FLASK_SECRET not set - generated an ephemeral session key. "
+        "Sessions will not survive a restart. Set FLASK_SECRET for a "
+        "persistent deployment.",
+        file=sys.stderr,
+    )
+app.secret_key = _secret
 
 
 def _load_version():

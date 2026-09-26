@@ -26,6 +26,11 @@ Web UI (Flask) --> GitHub Actions --> Packer --> EC2 (t2.micro / t3.small) --> A
 - GitHub account (a fresh repo is fine — everything is in this repository)
 - **`git` and the AWS CLI v2** on the machine used for the one-time IAM setup
   (skip this if you're a restricted/non-admin user following [Step 1c](#1c-restricted--non-admin-aws-user-no-iam-rights) — the app only needs your existing access keys)
+- **`gh`** (GitHub CLI) and **`ssh-keygen`**, if you use the
+  [one-command path](#the-one-command-path-recommended) or want `bootstrap.sh`
+  to set your GitHub secrets for you. Both ship with macOS and with the GitHub
+  CLI install; everything works without them if you set the two secrets by hand
+  in the GitHub UI.
 
 **Install `git` + AWS CLI v2 on a fresh Ubuntu VM** (skip if already present):
 
@@ -57,6 +62,41 @@ aws configure    # enter an IAM user access key + secret + region
 
 > These steps are the **same for every way of running the app** — they must be done
 > once before using the web UI (see [Ways to run the app](#ways-to-run-the-app)).
+
+### The one-command path (recommended)
+
+If you are starting from a **fresh GitHub repo and a fresh AWS account**, do this
+instead of the manual steps 0-2 below. It performs every one-time setup step in
+the right order and prints the same information the manual path does:
+
+```bash
+# Prerequisites: git, AWS CLI v2, gh CLI, ssh-keygen (see Prerequisites above)
+aws configure          # an IAM user access key + secret + a default region
+
+git clone https://github.com/<YOU>/<YOUR-REPO>.git && cd <YOUR-REPO>
+
+# one command: AWS role + OIDC trust + SSH key + GitHub secrets
+./scripts/bootstrap.sh <YOU>/<YOUR-REPO> us-east-1
+```
+
+Then confirm everything is wired up before you spend money on a build:
+
+```bash
+./scripts/verify-setup.sh <YOU>/<YOUR-REPO> us-east-1
+```
+
+`verify-setup.sh` is the fastest way to diagnose a broken setup — it checks the
+AWS identity, the role's trust policy, the attached IAM policy, the OIDC
+provider, both GitHub secrets, whether Actions is enabled, and your EC2 quota,
+and it tells you the exact command to fix each failure.
+
+> **You must run `bootstrap.sh` with your own fork's `owner/repo`.** The IAM
+> trust is pinned to that exact repository *and* branch. Running it with this
+> repository's `azlabgen2025/z-golden-image-pipeline` will configure the upstream
+> project, not your fork, and your builds will fail with a credentials error.
+
+The manual equivalent of each step is documented below if you prefer to do them
+one at a time, or if you need to understand what a step changes.
 
 ### 0. GitHub repo setup (one-time)
 
@@ -130,19 +170,22 @@ aws configure    # enter an IAM user access key + secret + region
 **1b. Run the IAM/OIDC setup script:**
 
 ```bash
-cd scripts
-chmod +x setup-aws.sh
-./setup-aws.sh us-east-1
+chmod +x scripts/setup-aws.sh
+./scripts/setup-aws.sh <YOU>/<YOUR-REPO> [region]     # e.g. ./scripts/setup-aws.sh alice/golden-image-pipeline us-east-1
 ```
 
-The script will **prompt you** for your GitHub organisation/username and the
-forked repo name (e.g. `alice` and `golden-image-pipeline`) — these become the
-OIDC trust condition, so enter your **fork**, not this repository.
+Pass **your own fork's `owner/repo`**, not `azlabgen2025/z-golden-image-pipeline`.
+If you omit the arguments the script prompts for them. Add `--dry-run` first to
+print every change without applying it.
 
 This creates:
 - IAM role `GitHubActionsPackerRole` with an OIDC trust to your GitHub repo
 - IAM policy `GoldenImagePackerPolicy` (EC2/S3/PassRole access for builds)
 - Prints the role ARN to paste as a GitHub secret
+
+The script is idempotent: re-running it against a role that already exists
+**updates the trust policy in place** rather than failing, and it refuses to
+clobber a policy whose current version was not created by this script.
 
 **1c. Restricted / non-admin AWS user (no IAM rights):**
 
@@ -164,8 +207,11 @@ run under your account — it needs admin rights. Do this instead:
    don't need the AWS CLI at all for the web-app path.
 
 > **Security note for the admin:** the OIDC trust is scoped to exactly one
-> GitHub repo (`repo:<org>/<fork>:*`), and the role can only build AMIs — it
-> can't touch anything in your AWS account outside this repo's workflow runs.
+> GitHub repo *and one ref* — `repo:<owner>/<repo>:ref:refs/heads/main` — and
+> pull-request subjects are explicitly excluded, so a fork or an untrusted PR
+> cannot assume the role. The role can only build AMIs; it can't touch anything
+> else in your AWS account. If you need builds from a second branch, add it
+> explicitly with `./scripts/setup-aws.sh <owner>/<repo> <region> refs/heads/<branch>`.
 
 ### 2. GitHub Secrets
 
@@ -176,29 +222,34 @@ run under your account — it needs admin rights. Do this instead:
 - Name: `AWS_ROLE_TO_ASSUME` — Value: the ARN printed by `setup-aws.sh`
   (looks like `arn:aws:iam::123456789012:role/GitHubActionsPackerRole`)
 
-**2b. Generate the golden SSH keypair and add both halves:**
+**2b. Generate the golden SSH keypair and add the private half:**
 
 ```bash
-# 1. Generate your OWN keypair (never reuse someone else's)
-ssh-keygen -t rsa -b 2048 -f golden -N ""
+# 1. Generate YOUR OWN keypair. The public half is written to
+#    ansible/base/vars/golden_user.pub, which is git-ignored on purpose:
+./scripts/setup-keys.sh            # add a path to override the key location
 
-# 2. Bake YOUR public key into the repo (replaces the bundled demo key)
-cp golden.pub ansible/base/vars/golden_user.pub
-git add ansible/base/vars/golden_user.pub
-git commit -m "Bake own golden SSH key into base images"
-git push
-
-# 3. Add the PRIVATE key as the second GitHub secret:
+# 2. Add the PRIVATE key as the second GitHub secret:
 #    repo → Settings → Secrets and variables → Actions → New repository secret
-#    Name: GOLDEN_SSH_PRIVATE_KEY   Value: paste the contents of golden (the file, not .pub)
+#    Name: GOLDEN_SSH_PRIVATE_KEY   Value: the contents of the private key file
+#    gh secret set GOLDEN_SSH_PRIVATE_KEY < ~/.ssh/golden-image
 ```
 
-Why this step matters: every base image has the key `ansible/base/vars/golden_user.pub`
-burned into the standard `ec2-user` account. The customized (layered) build job connects
-to those images by SSH, so the private key you add as `GOLDEN_SSH_PRIVATE_KEY` **must be
-the exact counterpart of that public key**. If you skip step 2, your custom builds will
-fail to connect (the image only trusts the bundled key, which you don't own). Base-only
-builds work without this secret.
+> **Do not commit `ansible/base/vars/golden_user.pub`.** It is deliberately listed
+> in `.gitignore` so that each installer's key stays out of the repository.
+> `.example` is the only key file tracked in git, and it is a throwaway nobody
+> holds the private half for. If you add a real key to a commit by accident,
+> rotate the keypair and rewrite the history before pushing.
+
+Why this step matters: every base image has the public key from
+`ansible/base/vars/golden_user.pub` burned into the standard `ec2-user` account.
+The customized (layered) build job connects to those images by SSH, so the
+private key you add as `GOLDEN_SSH_PRIVATE_KEY` **must be the exact counterpart**
+of that public key. `setup-keys.sh` writes both halves from one `ssh-keygen`
+call, so they always match. The workflow also re-derives the public key from the
+private secret at build time (`ssh-keygen -y`) and passes it to Packer, so the
+secret is the single source of truth — if the two ever disagree, the build fails
+loudly instead of producing an unreachable image.
 
 The `AWS_ROLE_TO_ASSUME` role is what the GitHub Actions workflow assumes
 (OIDC) to build AMIs in your AWS account. The web UI can also pass a
@@ -278,10 +329,17 @@ docker run -d --name golden-image-pipeline --restart unless-stopped \
 ```
 
 That's it — pull and run. Open `http://localhost:8080` (or `http://<host-ip>:8080`)
-and log in with `admin` / `admin`. The image:
+and log in as `admin`. The generated password is printed once in the startup log:
 
-- **Defaults to plain HTTP on port 8080** with `admin`/`admin` login (change the
-  password via the **Password** menu after first login).
+```bash
+docker compose logs golden-image-pipeline | grep -A5 'ADMIN PASSWORD'
+```
+
+The image:
+
+- **Defaults to plain HTTP on port 8080** and generates a random admin password on
+  first boot (change it via the **Password** menu after first login). To pin your
+  own, set `ADMIN_PASSWORD` in `.env` before the first start.
 - **HTTPS is automatic** when you mount certs at `/app/certs` (generate once with
   `./scripts/gen-cert.sh certs ...` for your IP/hostname).
 - **Data persists** in the named `golden-image-data` volume (SQLite DB + encryption key).
@@ -311,7 +369,7 @@ docker compose up -d --build            # or: ./scripts/run-web.sh docker
 ```
 
 - **Access**: `https://localhost:8080` — or from any machine on your LAN via the
-  **host machine's IP**: `https://<host-ip>:8080` (e.g. `https://192.168.1.216:8080`).
+  **host machine's IP**: `https://<host-ip>:8080` (e.g. `https://192.168.1.50:8080`).
   Change the host port with `APP_PORT=9090 docker compose up -d`.
 - **HTTPS** is automatic when `certs/tls.crt`+`certs/tls.key` are present (the
   `./certs` volume) — plain `http://` otherwise.
@@ -370,7 +428,10 @@ Security notes:
 - Responses are served as **no-cache, always fresh** (`Cache-Control: no-store`), so a plain refresh (or `Cmd+Shift+R` if the tab is old) always shows the latest version — no stale modal/page bugs.
 
 - Open `https://localhost:8080` (self-signed browser warning is expected) or `http://localhost:8080` if no certs
-- Default admin login: `admin` / `admin` — no forced change on login; a non-blocking banner reminds you to set a new password (use the **Password** menu). New/reset users land straight in the app too.
+- Default admin login: `admin` plus the password shown at startup (random in
+  Docker, `admin` for a local `./scripts/run-web.sh` run with no `ADMIN_PASSWORD`
+  set) — no forced change on login; a non-blocking banner reminds you to set a new
+  password (use the **Password** menu). New/reset users land straight in the app too.
 - Config via env vars: `ADMIN_USER`, `ADMIN_PASSWORD`, `DATABASE_PATH`, `SECRET_KEY_FILE`, `FLASK_SECRET`, `PORT`, `FLASK_DEBUG` (default `false`), `CUSTOMER`, `DEFAULT_OS`
 - AWS keys entered in the UI are encrypted at rest (Fernet) in SQLite
 - GitHub connection is per-user, stored encrypted (needs a PAT with `workflow` scope)
@@ -425,15 +486,48 @@ volume is always reused.
 That error comes from `aws-actions/configure-aws-credentials@v6` and is about the
 **OIDC role**, not the web app keys. Builds run in GitHub Actions and assume the role
 stored in the `AWS_ROLE_TO_ASSUME` secret — they never use the keys pasted into the
-web UI. Check, in order:
+web UI.
 
-1. Your fork has the `AWS_ROLE_TO_ASSUME` secret = the exact role ARN printed by
-   `setup-aws.sh` (same AWS account that owns the golden AMIs).
-2. Actions is enabled on the fork (GitHub → fork → Actions tab → Enable).
-3. `setup-aws.sh` was run once by an AWS admin so the OIDC provider + role exist for
-   *your* repo.
-4. The `AWS_ROLE_TO_ASSUME` role and the Web UI Connect-AWS account point to the
-   **same** AWS account.
+**Start here instead of guessing:**
+
+```bash
+./scripts/verify-setup.sh <YOU>/<YOUR-REPO> <region>
+```
+
+That single command checks every link in the chain and prints the exact fix for
+whatever is broken. It is almost always one of these:
+
+1. **The trust policy points at the wrong repository.** This is the most common
+   cause by far. The role's trust must contain
+   `repo:<YOUR-GITHUB-USERNAME>/<YOUR-REPO>:ref:refs/heads/main` — matching the
+   repo you pushed to, character for character. If it says
+   `azlabgen2025/z-golden-image-pipeline:*` you configured the upstream project
+   instead of your own fork, and nothing you do in your fork will ever be
+   trusted. Fix:
+   ```bash
+   ./scripts/setup-aws.sh <YOU>/<YOUR-REPO> <region>
+   ```
+2. **The role ARN secret is missing or points at a different account.** The
+   `AWS_ROLE_TO_ASSUME` secret must be the exact ARN printed by `setup-aws.sh`,
+   and it must live in the same AWS account that owns the golden AMIs.
+3. **Actions is disabled on your fork.** Forks often start with Actions off:
+   GitHub → your fork → **Actions** tab → **Enable GitHub Actions**.
+4. **A wildcard or PR subject leaked into the trust policy.** Trust must not
+   contain `*` in place of a ref, and must not include
+   `repo:<owner>/<repo>:pull_request`. Re-running `setup-aws.sh` rewrites the
+   trust policy correctly.
+5. **The role and the web UI are pointed at different AWS accounts.** The
+   `AWS_ROLE_TO_ASSUME` role and the Web UI **Connect AWS** account must be the
+   same account.
+
+To inspect the live trust policy yourself:
+
+```bash
+aws iam get-role --role-name GitHubActionsPackerRole \
+  --query 'Role.AssumeRolePolicyDocument' --output json | python3 -m json.tool
+```
+
+Look for your `repo:` line. If it is missing, that is the problem.
 
 **How to version / pin the container to a known build.** Every image push records a row
 in [BUILDS.md](./BUILDS.md) (build #, commit, date, tags, digest, change summary). To run
@@ -453,7 +547,13 @@ rm -f web/golden_image.db     # recreated on next start with only the admin user
 
 Or, in one command: `./scripts/reset.sh` (stops the app, wipes DB/secret key/pycache, creates the pristine DB, and starts it). `./scripts/reset.sh --no-start` resets without launching.
 
-- Fresh DB has exactly one user: `admin` / `admin`. There is no forced login flow — the app opens immediately and a banner reminds you to change the default password via the **Password** button.
+- Fresh DB has exactly one user: `admin` plus the password in `ADMIN_PASSWORD`.
+  In Docker that password is **generated randomly and printed once** in the
+  container log on first boot (`docker compose logs golden-image-pipeline`); with
+  `./scripts/run-web.sh` it defaults to `admin` and is announced on startup. Set
+  `ADMIN_PASSWORD` in `.env` before the first start to choose your own. There is
+  no forced login flow — the app opens immediately and a banner reminds you to
+  change the default password via the **Password** button.
 - To only reset the admin password without wiping data, start with `ADMIN_RESET=1`:
 
 ```bash
@@ -543,13 +643,16 @@ web/
     ├── templates/          # login.html, index.html
     └── requirements.txt    # flask, cryptography, boto3, requests, gunicorn
 scripts/
+    ├── bootstrap.sh        # one-shot: role + OIDC trust + SSH key + GitHub secrets
+    ├── verify-setup.sh     # pre-build checklist; prints the fix for each failure
+    ├── setup-keys.sh       # generate your golden SSH keypair (public half git-ignored)
     ├── setup-aws.sh        # IAM/OIDC setup
     ├── setup-ec2.sh        # one-shot EC2 deploy (clone→certs→.env→compose)
     ├── run-docker-aws.sh   # pull-and-run prebuilt GHCR image (no build/clone)
     ├── packer-build.sh     # local build helper
     ├── gen-cert.sh         # self-signed TLS cert generator
     ├── run-web.sh          # run app (local/docker), auto-enables HTTPS
-    └── reset.sh            # full fresh start: stop, wipe DB/caches, recreate, run
+    ├── reset.sh            # full fresh start: stop, wipe DB/caches, recreate, run
     └── docker-entrypoint.sh # container entrypoint, auto-detects certs
 Dockerfile
 docker-compose.yml

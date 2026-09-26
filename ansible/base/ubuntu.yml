@@ -3,6 +3,7 @@
   hosts: all
   become: true
   vars:
+    golden_user_pub: "{{ lookup('file', playbook_dir ~ '/vars/golden_user.pub', errors='ignore') | default('', true) }}"
     base_packages:
       - git
       - vim
@@ -125,10 +126,20 @@
       ansible.builtin.lineinfile:
         path: /home/ec2-user/.ssh/authorized_keys
         create: true
-        line: "{{ lookup('file', playbook_dir ~ '/vars/golden_user.pub') }}"
+        line: "{{ golden_user_pub }}"
         owner: ec2-user
         group: ec2-user
         mode: "0600"
+      when: golden_user_pub | length > 0
+
+    - name: Warn that no golden SSH key was provided
+      ansible.builtin.debug:
+        msg: >-
+          No golden_user_pub supplied and ansible/base/vars/golden_user.pub is
+          absent, so no project key was baked into ec2-user. The image is still
+          reachable with your EC2 launch keypair (cloud-init injects it into
+          ec2-user). Run scripts/setup-keys.sh to enable project-key SSH.
+      when: golden_user_pub | length == 0
 
     - name: Create customer marker file
       ansible.builtin.copy:

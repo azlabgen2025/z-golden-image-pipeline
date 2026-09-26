@@ -28,6 +28,20 @@ if [ -z "${FLASK_SECRET}" ]; then
     export FLASK_SECRET="$(python -c "from secrets import token_hex; print(token_hex(32))")"
 fi
 
+# Generate an admin password if the operator did not supply one. Applied only
+# when the database is first created (db.create_default_admin is a no-op once
+# the user exists), so this does not reset the password on later restarts.
+if [ -z "${ADMIN_PASSWORD}" ]; then
+    export ADMIN_PASSWORD="$(python -c "from secrets import token_urlsafe; print(token_urlsafe(12))")"
+    echo "[entrypoint] ================================================"
+    echo "[entrypoint]  ADMIN PASSWORD (first boot only, shown once):"
+    echo "[entrypoint]    ${ADMIN_PASSWORD}"
+    echo "[entrypoint]  Change it in the app after logging in."
+    echo "[entrypoint]  To choose your own, set ADMIN_PASSWORD in .env"
+    echo "[entrypoint]  before the first start."
+    echo "[entrypoint] ================================================"
+fi
+
 TLS_CERTFILE=""
 if [ -f /app/certs/tls.crt ] && [ -f /app/certs/tls.key ]; then
     export TLS_CERT=/app/certs/tls.crt
