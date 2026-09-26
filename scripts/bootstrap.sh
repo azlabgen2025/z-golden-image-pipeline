@@ -25,17 +25,27 @@ KEY_PATH="${KEY_PATH:-$HOME/.ssh/golden-image}"
 DRY_RUN=false
 SKIP_SECRETS=false
 FORCE_KEYS=false
-for a in "$@"; do
-  case "$a" in
-    --dry-run)      DRY_RUN=true; shift ;;
-    --skip-secrets) SKIP_SECRETS=true ;;
-    --force-keys)   FORCE_KEYS=true ;;
-  esac
+# Parse flags in any position. A plain `for a in "$@"` loop cannot do this: the
+# list is expanded once, so a trailing --dry-run would shift the positional
+# arguments and turn "repo us-east-1 --dry-run" into repo=us-east-1.
+POSITIONAL=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --dry-run)      DRY_RUN=true ;;
+        --skip-secrets) SKIP_SECRETS=true ;;
+        --force-keys)   FORCE_KEYS=true ;;
+        -h|--help)      sed -n '4,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --)             shift; POSITIONAL+=("$@"); break ;;
+        -*)             echo "ERROR: unknown option: $1" >&2
+                         echo "Try: $0 --help" >&2; exit 2 ;;
+        *)              POSITIONAL+=("$1") ;;
+    esac
+    shift
 done
 
 # ---- resolve owner/repo + region -------------------------------------------
-REPO_FULL="${1:-${GITHUB_REPO:-}}"
-REGION="${2:-${AWS_REGION:-us-east-1}}"
+REPO_FULL="${POSITIONAL[0]:-${GITHUB_REPO:-}}"
+REGION="${POSITIONAL[1]:-${AWS_REGION:-us-east-1}}"
 
 if [ -z "$REPO_FULL" ]; then
   if [ ! -t 0 ]; then
@@ -62,17 +72,20 @@ echo
 
 # ---- 1. SSH keypair ---------------------------------------------------------
 echo "--- [1/3] SSH keypair -------------------------------------"
-if [ -e "$KEY_PATH" ] || [ -e "${KEY_PATH}.pub" ]; then
-  echo "    ${KEY_PATH} already exists; keeping it."
-  echo "    (use --force-keys to replace; images built earlier keep the old key)"
+if { [ -e "$KEY_PATH" ] || [ -e "${KEY_PATH}.pub" ]; } && [ "$FORCE_KEYS" != true ]; then
+    echo "    ${KEY_PATH} already exists; keeping it."
+    echo "    (use --force-keys to replace; images built earlier keep the old key)"
 else
-  if [ "$DRY_RUN" = true ]; then
-    echo "    would generate ${KEY_PATH}"
-  else
-    "$REPO_ROOT/scripts/setup-keys.sh" "$KEY_PATH" >/dev/null
-    echo "    generated ${KEY_PATH}"
-    ssh-keygen -lf "${KEY_PATH}.pub" | sed 's/^/    /'
-  fi
+    if [ "$DRY_RUN" = true ]; then
+        echo "    would generate ${KEY_PATH}"
+    else
+        # setup-keys.sh refuses to clobber an existing pair, so clear it first
+        # when the user explicitly asked for a replacement.
+        rm -f "$KEY_PATH" "${KEY_PATH}.pub"
+        "$REPO_ROOT/scripts/setup-keys.sh" "$KEY_PATH" >/dev/null
+        echo "    generated ${KEY_PATH}"
+        ssh-keygen -lf "${KEY_PATH}.pub" | sed 's/^/    /'
+    fi
 fi
 echo
 

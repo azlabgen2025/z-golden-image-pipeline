@@ -46,7 +46,9 @@ if [ -e "$KEY_PATH" ] || [ -e "${KEY_PATH}.pub" ]; then
 fi
 
 mkdir -p "$(dirname "$KEY_PATH")"
-chmod 700 "$(dirname "$KEY_PATH")"
+# Do NOT chmod the parent directory: it may be a shared location we do not own
+# (/tmp, a group dir), and failing there would abort key generation. ssh-keygen
+# creates the private key 0600 already, and we assert it below.
 
 echo "==> Generating RSA-2048 keypair at ${KEY_PATH}"
 ssh-keygen -t rsa -b 2048 -N "" -C "golden-image-pipeline" -f "$KEY_PATH" >/dev/null
