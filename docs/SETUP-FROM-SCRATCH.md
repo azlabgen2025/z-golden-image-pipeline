@@ -132,6 +132,10 @@ aws sts get-caller-identity
 You should see your **Account** and **Arn**. If you get an error, the keys are
 wrong — repeat this step.
 
+> This key has admin rights because the one-time setup needs them. It is used
+> only for setup and for listing your images. Narrowing it down is optional and
+> can be done later.
+
 ---
 
 ## Step 4 — Log in to GitHub from the server
@@ -325,4 +329,7 @@ Also useful:
 | Forgot the admin password | `grep ADMIN_PASSWORD /opt/golden-image-pipeline/.env` |
 | Connect GitHub returns 404 | Fix the two token permissions in Step 10 |
 | "VcpuLimitExceeded" | Stop old instances, or ask AWS to raise the limit |
+| `gh` says the repo name already exists | The old repo was not deleted. Delete it on GitHub, then redo Step 6 |
+| GitHub refuses to create a public repo | Verify your email at <https://github.com/settings/emails>, then retry Step 6 |
+| `aws configure` rejects the key, or you only use SSO | Attach an IAM role to the instance instead and skip Step 3's `aws configure` |
 | Want to start completely over | Delete your GitHub repo and repeat from Step 6 |
