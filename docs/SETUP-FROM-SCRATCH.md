@@ -330,6 +330,7 @@ Also useful:
 | Connect GitHub returns 404 | Fix the two token permissions in Step 10 |
 | "VcpuLimitExceeded" | Stop old instances, or ask AWS to raise the limit |
 | `gh` says the repo name already exists | The old repo was not deleted. Delete it on GitHub, then redo Step 6 |
+| `gh repo view` prints `azlabgen2025/z-golden-image-pipeline` | Step 6 did not create your copy. Either re-run Step 6, or point at your own repo: `git remote add origin https://github.com/$GH_USER/$REPO.git` then `git push -u origin main`. A build will fail with `AssumeRoleWithWebIdentity` while this still shows the template repo — the AWS role trusts your repo, not azlabgen's |
 | GitHub refuses to create a public repo | Verify your email at <https://github.com/settings/emails>, then retry Step 6 |
 | `aws configure` rejects the key, or you only use SSO | Attach an IAM role to the instance instead and skip Step 3's `aws configure` |
 | Want to start completely over | Delete your GitHub repo and repeat from Step 6 |
