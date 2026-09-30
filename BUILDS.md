@@ -14,6 +14,7 @@ safe to roll back: every build points to exactly one commit.
 | 21 | 0.1.0 | `557889e` | 2026-09-23 | `v0.1.0-build-21`, `v0.1.0-557889e` | `a319669b8f5981ab747e92e70251026360875928248ac1d00f638acba1ba9faa` | ci: give Build step id 'build-push' so the Record build step fires (it was skipped every run) |
 | 25 | 0.1.0 | `ae5b15b` | 2026-09-26 | `v0.1.0-build-25`, `v0.1.0-ae5b15b` | sha256:65b648948b0544279bdf9e0e4c43c9d8b063b29f78d9bc615024ab1bc2c621af | Fix argument parsing and key generation in the setup scripts |
 | 27 | 0.1.0 | `7974130` | 2026-09-26 | `v0.1.0-build-27`, `v0.1.0-7974130` | sha256:b8bba737e27731dbbeecd0960a6e37e5c62c72282c79dd689ab3833cb4a22638 | Add a complete non-expert setup guide |
+| 34 | 0.1.0 | `c3ab1d4` | 2026-09-30 | `v0.1.0-build-34`, `v0.1.0-c3ab1d4` | sha256:a0087275a3c8d6782ab09f04b8c90aa178798c834a0c7842dc255b27ad2e79de | Name the real cause of the GitHub API 403 dispatch error |
 
 > Note: build 1's counter was under-estimated (shallow clone); the count was
 > corrected to the real value (17) once the workflow fetched full history.
