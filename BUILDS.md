@@ -15,6 +15,7 @@ safe to roll back: every build points to exactly one commit.
 | 25 | 0.1.0 | `ae5b15b` | 2026-09-26 | `v0.1.0-build-25`, `v0.1.0-ae5b15b` | sha256:65b648948b0544279bdf9e0e4c43c9d8b063b29f78d9bc615024ab1bc2c621af | Fix argument parsing and key generation in the setup scripts |
 | 27 | 0.1.0 | `7974130` | 2026-09-26 | `v0.1.0-build-27`, `v0.1.0-7974130` | sha256:b8bba737e27731dbbeecd0960a6e37e5c62c72282c79dd689ab3833cb4a22638 | Add a complete non-expert setup guide |
 | 34 | 0.1.0 | `c3ab1d4` | 2026-09-30 | `v0.1.0-build-34`, `v0.1.0-c3ab1d4` | sha256:a0087275a3c8d6782ab09f04b8c90aa178798c834a0c7842dc255b27ad2e79de | Name the real cause of the GitHub API 403 dispatch error |
+| 36 | 0.1.0 | `780e77e` | 2026-09-30 | `v0.1.0-build-36`, `v0.1.0-780e77e` | sha256:ae678dfb5bb567dfec432d8caccd6623f828fbc513fcbed4de4bf157075b1ca3 | Audit pass: fix region/other build bugs, sync custom role names, harden session cookies |
 
 > Note: build 1's counter was under-estimated (shallow clone); the count was
 > corrected to the real value (17) once the workflow fetched full history.
