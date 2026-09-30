@@ -214,9 +214,11 @@ run under your account — it needs admin rights. Do this instead:
    don't need the AWS CLI at all for the web-app path.
 
 > **Security note for the admin:** the OIDC trust is scoped to exactly one
-> GitHub repo *and one ref* — `repo:<owner>/<repo>:ref:refs/heads/main` — and
+> GitHub repo *and one ref* — `repo:<owner>@*/<repo>@*:ref:refs/heads/main` — and
 > pull-request subjects are explicitly excluded, so a fork or an untrusted PR
-> cannot assume the role. The role can only build AMIs; it can't touch anything
+> cannot assume the role. (GitHub's OIDC `sub` embeds numeric owner/repository
+> IDs, so the `@*` wildcards are required to match the current token format.)
+> The role can only build AMIs; it can't touch anything
 > else in your AWS account. If you need builds from a second branch, add it
 > explicitly with `./scripts/setup-aws.sh <owner>/<repo> <region> refs/heads/<branch>`.
 
@@ -506,8 +508,9 @@ whatever is broken. It is almost always one of these:
 
 1. **The trust policy points at the wrong repository.** This is the most common
    cause by far. The role's trust must contain
-   `repo:<YOUR-GITHUB-USERNAME>/<YOUR-REPO>:ref:refs/heads/main` — matching the
-   repo you pushed to, character for character. If it says
+   `repo:<YOUR-GITHUB-USERNAME>@*/<YOUR-REPO>@*:ref:refs/heads/main` — matching the
+   repo you pushed to (the `@*` segments stand in for the numeric owner/repository
+   IDs GitHub embeds in its OIDC `sub`). If it says
    `azlabgen2025/z-golden-image-pipeline:*` you configured the upstream project
    instead of your own fork, and nothing you do in your fork will ever be
    trusted. Fix:

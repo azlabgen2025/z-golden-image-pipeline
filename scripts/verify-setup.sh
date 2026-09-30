@@ -118,7 +118,7 @@ print(" ".join(sorted(set(re.findall(r"repo:[^\\\"]+", s)))))
     info "Re-run: ./scripts/setup-aws.sh ${REPO_FULL} ${REGION}"
   else
     echo "        trusts: ${TRUST}"
-    EXPECTED="repo:${OWNER}/${REPO}:"
+    EXPECTED="repo:${OWNER}@*/${REPO}@*:"
     if printf '%s' "$TRUST" | grep -qF "$EXPECTED"; then
       ok "trust policy includes this repository"
     else

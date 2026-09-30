@@ -103,11 +103,17 @@ OIDC_ARN="arn:aws:iam::${ACCOUNT}:oidc-provider/token.actions.githubusercontent.
 # so that a pull_request from a fork -- whose sub is repo:owner/repo:pull_request
 # -- can never satisfy the trust policy. Do not add a pull_request trigger to
 # the build workflow while this policy is in place.
+#
+# GitHub's OIDC `sub` claim today embeds the numeric owner and repository IDs
+# (e.g. repo:owner@123/repo@456:ref:refs/heads/main), so the wildcarded @*
+# segments are required -- a plain "repo:owner/repo:..." pattern no longer
+# matches anything. The @* wildcards only match numbers inside the user/repo
+# position and cannot widen the trust to other owners or repositories.
 SUBS=()
 for ref in "${REFS[@]}"; do
   case "$ref" in
-    refs/heads/*) SUBS+=("repo:${GITHUB_OWNER}/${GITHUB_REPO}:ref:${ref}") ;;
-    *)            SUBS+=("repo:${GITHUB_OWNER}/${GITHUB_REPO}:ref:refs/heads/${ref}") ;;
+    refs/heads/*) SUBS+=("repo:${GITHUB_OWNER}@*/${GITHUB_REPO}@*:ref:${ref}") ;;
+    *)            SUBS+=("repo:${GITHUB_OWNER}@*/${GITHUB_REPO}@*:ref:refs/heads/${ref}") ;;
   esac
 done
 
