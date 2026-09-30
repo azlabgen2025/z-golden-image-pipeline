@@ -33,9 +33,17 @@ OIDC_URL="https://token.actions.githubusercontent.com"
 OIDC_THUMBPRINT="6938fd4d98bab03faadb97b34396831e3780aea1"
 
 DRY_RUN=false
+for _a in "$@"; do
+  if [ "$_a" = "--dry-run" ]; then
+    DRY_RUN=true
+  fi
+done
 if [ "${1:-}" = "--dry-run" ]; then
-  DRY_RUN=true
   shift
+fi
+if [ "$DRY_RUN" = true ]; then
+  echo "==> DRY-RUN mode: no AWS resources will be created or modified."
+  echo
 fi
 
 # ---- arguments / prompts ---------------------------------------------------
