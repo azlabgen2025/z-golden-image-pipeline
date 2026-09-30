@@ -18,7 +18,12 @@ def _headers(token):
 
 
 def verify_connection(token, repo):
-    """Check token can read the repo and list the workflow."""
+    """Check token can read the repo and list the workflow.
+
+    NOTE: this only proves READ access. Dispatching a workflow needs Actions =
+    read AND write, so a token with Actions on read-only passes here but fails
+    on every build with GitHub API 403. The dispatch function names that case.
+    """
     url = f"https://api.github.com/repos/{repo}/actions/workflows/build-image.yml"
     try:
         resp = requests.get(url, headers=_headers(token), timeout=15)
@@ -68,7 +73,27 @@ def trigger_workflow_dispatch(token, repo, inputs, ref="main"):
             if run:
                 return {"ok": True, "run_id": run["id"], "run_url": run["html_url"]}
             return {"ok": True}
-        return {"ok": False, "error": f"GitHub API {resp.status_code}: {resp.json().get('message', resp.text[:200])}"}
+        body = resp.json().get("message", resp.text[:200]) if resp.content else "empty response"
+        if resp.status_code == 403:
+            # The most common cause is a fine-grained token with Actions left on
+            # READ-ONLY: verify_connection() only GETs the workflow (read), so it
+            # passes, but dispatching a workflow_required WRITE access and GitHub
+            # returns this generic 403. Getting a 403 rather than 404 also means
+            # the repo string was found, so "repo" is correct.
+            return {
+                "ok": False,
+                "error": (
+                    f"GitHub API 403: {body} (dispatch to {repo}). Not a code "
+                    "problem — the app token can READ the repo but not START "
+                    "workflows. Regenerate the fine-grained token at "
+                    "github.com/settings/personal-access-tokens with the SAME repo "
+                    f"({repo}) selected, permissions Actions = Read and write, "
+                    "Metadata = Read-only, then in the app re-save it under "
+                    "Settings -> Connect GitHub. A token stuck on Actions "
+                    "Read-only connects fine but fails every build with this error."
+                ),
+            }
+        return {"ok": False, "error": f"GitHub API {resp.status_code}: {body}"}
     except Exception as e:
         return {"ok": False, "error": str(e)}
 

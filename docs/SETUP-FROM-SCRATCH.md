@@ -295,6 +295,13 @@ only used to list your images; the builds themselves do not use it.
 
 > If the app says **404** on Connect GitHub, it is almost always the two
 > permissions above. Re-check Actions = Read and write.
+>
+> **If builds fail with `GitHub API 403: Resource not accessible by personal
+> access token`:** the token has Actions on **Read-only** (or is still scoped to
+> an old/deleted copy of the repo). Read-only Actions *passes* the connection
+> check but *cannot start* builds — GitHub needs Actions = **Read and write**.
+> Re-generate the token with Actions = Read and write and exactly **your** repo
+> selected, then save it again under Settings → Connect GitHub.
 
 ---
 
@@ -328,6 +335,7 @@ Also useful:
 | App page will not open | Check the 8080 inbound rule in Step 0 |
 | Forgot the admin password | `grep ADMIN_PASSWORD /opt/golden-image-pipeline/.env` |
 | Connect GitHub returns 404 | Fix the two token permissions in Step 10 |
+| Build fails, "GitHub API 403: Resource not accessible by personal access token" | The app token has Actions **Read-only** (or is scoped to the old repo). Re-generate it with Actions = **Read and write** + exactly your repo selected, save it again in Settings → Connect GitHub |
 | "VcpuLimitExceeded" | Stop old instances, or ask AWS to raise the limit |
 | `gh` says the repo name already exists | The old repo was not deleted. Delete it on GitHub, then redo Step 6 |
 | `gh repo view` prints `azlabgen2025/z-golden-image-pipeline` | Step 6 did not create your copy. Either re-run Step 6, or point at your own repo: `git remote add origin https://github.com/$GH_USER/$REPO.git` then `git push -u origin main`. A build will fail with `AssumeRoleWithWebIdentity` while this still shows the template repo — the AWS role trusts your repo, not azlabgen's |
