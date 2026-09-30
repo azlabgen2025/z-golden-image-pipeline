@@ -21,6 +21,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 KEY_PATH="${KEY_PATH:-$HOME/.ssh/golden-image}"
+ROLE_NAME="${ROLE_NAME:-GitHubActionsPackerRole}"
 
 DRY_RUN=false
 SKIP_SECRETS=false
@@ -100,7 +101,7 @@ echo
 
 # ---- 3. GitHub secrets ------------------------------------------------------
 echo "--- [3/3] GitHub Actions secrets -----------------------"
-ROLE_ARN="arn:aws:iam::$(aws sts get-caller-identity --query Account --output text 2>/dev/null):role/GitHubActionsPackerRole"
+ROLE_ARN="arn:aws:iam::$(aws sts get-caller-identity --query Account --output text 2>/dev/null):role/${ROLE_NAME}"
 
 if [ "$SKIP_SECRETS" = true ]; then
   echo "    skipped (--skip-secrets). Add these by hand:"

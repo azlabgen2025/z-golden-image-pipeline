@@ -34,6 +34,20 @@ if not _secret:
     )
 app.secret_key = _secret
 
+_certs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "certs")
+_tls_cert = os.environ.get("TLS_CERT", "")
+_tls_key = os.environ.get("TLS_KEY", "")
+if not (_tls_cert and _tls_key):
+    _cand_cert = os.path.join(_certs_dir, "tls.crt")
+    _cand_key = os.path.join(_certs_dir, "tls.key")
+    if os.path.isfile(_cand_cert) and os.path.isfile(_cand_key):
+        _tls_cert, _tls_key = _cand_cert, _cand_key
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+# gunicorn imports the app (never runs __main__), so Secure must be set here.
+if _tls_cert and _tls_key:
+    app.config["SESSION_COOKIE_SECURE"] = True
+
 
 def _load_version():
     try:
@@ -302,6 +316,7 @@ def no_cache(resp):
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
+    resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp
 
 

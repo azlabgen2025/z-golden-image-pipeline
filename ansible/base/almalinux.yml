@@ -156,7 +156,7 @@
       ansible.builtin.copy:
         content: |
           ============================================
-           Golden Image - {{ image_type | default('base') }} (AlmaLinux 9)
+           Golden Image - {{ image_type | default('base') }} (AlmaLinux {{ ansible_distribution_major_version }})
            Customer: {{ customer | default('shared') }}
           ============================================
         dest: /etc/motd

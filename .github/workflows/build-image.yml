@@ -209,7 +209,7 @@ jobs:
           AMI_NAME: ${{ inputs.ami_name || '' }}
           AMI_TAGS: ${{ inputs.ami_tags || '' }}
         run: |
-          ARGS=(-var "customer=$CUSTOMER" -var "department=base")
+          ARGS=(-var "customer=$CUSTOMER" -var "department=base" -var "aws_region=$AWS_REGION")
           if [ -n "${GOLDEN_PUB:-}" ]; then
             ARGS+=(-var "golden_user_pub=$GOLDEN_PUB")
           fi
@@ -400,7 +400,7 @@ jobs:
             echo "Using default layer-2 AMI name: $AMI_NAME"
           fi
           EXTRA=$(echo "$CUSTOM_PKGS" | sed 's/[^,]*/"&"/g' | sed '1s/^/[/; $s/$/]/')
-          ARGS=(-var "customer=$CUSTOMER" -var "source_ami=$SOURCE_AMI" -var "extra_packages=$EXTRA" -var "department=customized")
+          ARGS=(-var "customer=$CUSTOMER" -var "source_ami=$SOURCE_AMI" -var "extra_packages=$EXTRA" -var "department=customized" -var "aws_region=$AWS_REGION")
           ARGS+=(-var "ssh_username=ec2-user" -var "ssh_private_key_file=${RUNNER_TEMP}/golden_ssh.pem")
           if [ -n "${GOLDEN_PUB:-}" ]; then
             ARGS+=(-var "golden_user_pub=$GOLDEN_PUB")

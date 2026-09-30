@@ -51,6 +51,11 @@ if [ "$HTTPS_FLAG" = "--https" ]; then
   CERT="$APP_DIR/certs/tls.crt"
   KEY="$APP_DIR/certs/tls.key"
   EXTFILE="$APP_DIR/certs/ext.cnf"
+  if printf '%s' "$PUBLIC_IP" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+    SAN_ADDR="IP:${PUBLIC_IP}"
+  else
+    SAN_ADDR="DNS:${PUBLIC_IP}"
+  fi
   cat > "$EXTFILE" <<EOF
 [req]
 distinguished_name = req_distinguished_name
@@ -59,11 +64,11 @@ prompt = no
 [req_distinguished_name]
 CN = $PUBLIC_IP
 [v3_req]
-subjectAltName = IP:$PUBLIC_IP,DNS:localhost,IP:127.0.0.1
+subjectAltName = ${SAN_ADDR},DNS:localhost,IP:127.0.0.1
 EOF
   openssl req -x509 -nodes \
     -newkey rsa:2048 -sha256 -days 365 \
-    -keyout "$KEY" -out "$CERT" -config "$EXTFILE" >/dev/null 2>&1
+    -keyout "$KEY" -out "$CERT" -config "$EXTFILE"
   rm -f "$EXTFILE"
   chmod 600 "$KEY"
   CERT_OPTS=(-v "$APP_DIR/certs:/app/certs:ro")

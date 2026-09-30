@@ -180,7 +180,10 @@ chmod +x scripts/setup-aws.sh
 
 Pass **your own fork's `owner/repo`**, not `azlabgen2025/z-golden-image-pipeline`.
 If you omit the arguments the script prompts for them. Add `--dry-run` first to
-print every change without applying it.
+print every change without applying it. The role/policy names are configurable
+via `ROLE_NAME` / `POLICY_NAME` environment variables (e.g.
+`ROLE_NAME=MyRole POLICY_NAME=MyPolicy ./scripts/setup-aws.sh ...`); the same two
+variables are honored by `bootstrap.sh` and `verify-setup.sh`.
 
 This creates:
 - IAM role `GitHubActionsPackerRole` with an OIDC trust to your GitHub repo

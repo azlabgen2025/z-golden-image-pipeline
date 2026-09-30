@@ -18,6 +18,7 @@ source "amazon-ebs" "other" {
   }
 
   ssh_username = var.ssh_username
+  ssh_private_key_file = var.ssh_private_key_file == "" ? null : var.ssh_private_key_file
 
   launch_block_device_mappings {
     device_name           = "/dev/sda1"

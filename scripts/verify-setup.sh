@@ -12,7 +12,8 @@ set -uo pipefail
 REPO_FULL="${1:-${GITHUB_REPO:-}}"
 REGION="${2:-${AWS_REGION:-us-east-1}}"
 KEY_PATH="${KEY_PATH:-$HOME/.ssh/golden-image}"
-ROLE_NAME="GitHubActionsPackerRole"
+ROLE_NAME="${ROLE_NAME:-GitHubActionsPackerRole}"
+POLICY_NAME="${POLICY_NAME:-GoldenImagePackerPolicy}"
 
 PASS=0; FAIL=0; WARN=0
 ok()   { printf '  \033[32mPASS\033[0m  %s\n' "$1"; PASS=$((PASS+1)); }
@@ -134,10 +135,10 @@ print(" ".join(sorted(set(re.findall(r"repo:[^\\\"]+", s)))))
   fi
   ATTACHED=$(aws iam list-attached-role-policies --role-name "$ROLE_NAME" \
     --query 'AttachedPolicies[].PolicyName' --output text 2>/dev/null)
-  if printf '%s' "$ATTACHED" | grep -q 'GoldenImagePackerPolicy'; then
-    ok "GoldenImagePackerPolicy attached to the role"
+  if printf '%s' "$ATTACHED" | grep -qF "${POLICY_NAME}"; then
+    ok "${POLICY_NAME} attached to the role"
   else
-    bad "GoldenImagePackerPolicy not attached to ${ROLE_NAME}"
+    bad "${POLICY_NAME} not attached to ${ROLE_NAME}"
     info "Re-run: ./scripts/setup-aws.sh ${REPO_FULL} ${REGION}"
   fi
 else

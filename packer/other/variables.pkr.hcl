@@ -38,6 +38,11 @@ variable "ssh_username" {
   default = "ec2-user"
 }
 
+variable "ssh_private_key_file" {
+  type    = string
+  default = ""
+}
+
 variable "golden_user_pub" {
   type    = string
   default = ""

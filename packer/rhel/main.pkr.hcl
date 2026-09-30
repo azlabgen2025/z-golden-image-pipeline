@@ -8,7 +8,7 @@ source "amazon-ebs" "rhel" {
     for_each = var.source_ami == "" ? [1] : []
     content {
       filters = {
-        name                = "RHEL-9.*_HVM-*-x86_64-*-Hourly2-GP3"
+        name                = "RHEL-9.*.0_HVM-*-x86_64-*"
         root-device-type    = "ebs"
         virtualization-type = "hvm"
       }
